@@ -1,0 +1,71 @@
+{
+  "group/herdr-watchr": {
+    "orientation": "inherit",
+    "modules": [
+      "custom/herdr-watchr-notify",
+      "custom/herdr-blocked",
+      "custom/herdr-idle",
+      "custom/herdr-done",
+      "custom/herdr-working",
+      "custom/herdr-unknown"
+    ]
+  },
+
+  "custom/herdr-watchr-notify": {
+    "exec": "herdr-watchr notify",
+    "return-type": "json",
+    "format": "{}",
+    "hide-empty-text": true,
+    "tooltip": false
+  },
+
+  "custom/herdr-blocked": {
+    "exec": "herdr-watchr status blocked",
+    "return-type": "json",
+    "format": "{}",
+    "hide-empty-text": true,
+    "tooltip": true,
+    "signal": 8,
+    "on-click": "herdr-watchr focus-status blocked"
+  },
+
+  "custom/herdr-idle": {
+    "exec": "herdr-watchr status idle",
+    "return-type": "json",
+    "format": "{}",
+    "hide-empty-text": true,
+    "tooltip": true,
+    "signal": 8,
+    "on-click": "herdr-watchr focus-status idle"
+  },
+
+  "custom/herdr-done": {
+    "exec": "herdr-watchr status done",
+    "return-type": "json",
+    "format": "{}",
+    "hide-empty-text": true,
+    "tooltip": true,
+    "signal": 8,
+    "on-click": "herdr-watchr focus-status done"
+  },
+
+  "custom/herdr-working": {
+    "exec": "herdr-watchr status working",
+    "return-type": "json",
+    "format": "{}",
+    "hide-empty-text": true,
+    "tooltip": true,
+    "signal": 8,
+    "on-click": "herdr-watchr focus-status working"
+  },
+
+  "custom/herdr-unknown": {
+    "exec": "herdr-watchr status unknown",
+    "return-type": "json",
+    "format": "{}",
+    "hide-empty-text": true,
+    "tooltip": true,
+    "signal": 8,
+    "on-click": "herdr-watchr focus-status unknown"
+  }
+}

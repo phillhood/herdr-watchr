@@ -1,0 +1,16 @@
+#herdr-watchr {
+  margin: 0px 4px 2px 2px;
+  padding: 0px;
+  border-radius: 4px;
+  background-color: rgba(24, 25, 38, 0.95);
+}
+
+#herdr-watchr label,
+#herdr-watchr > widget > label,
+#herdr-watchr > widget {
+  padding: 2px 7px;
+  margin: 0px;
+  color: #cad3f5;
+  font-weight: 900;
+  font-size: 14px;
+}

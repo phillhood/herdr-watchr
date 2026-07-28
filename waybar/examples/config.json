@@ -1,0 +1,17 @@
+{
+  "colors": {
+    "blocked": "#ed8796",
+    "idle": "#a6da95",
+    "done": "#8bd5ca",
+    "working": "#c6a0f6",
+    "unknown": "#6e738d"
+  },
+  "waybar": {
+    "click_action": "cycle",
+    "focus_window_cmd": [
+      "hyprctl",
+      "dispatch",
+      "hl.dsp.focus({window=\"address:{addr}\"})"
+    ]
+  }
+}
