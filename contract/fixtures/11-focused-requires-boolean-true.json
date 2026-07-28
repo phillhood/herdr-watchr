@@ -1,0 +1,17 @@
+{
+  "name": "a non-boolean focused value does not count as focused",
+  "agents": [
+    {"pane_id": "w2:p1", "terminal_id": "t2", "agent_status": "working",
+     "focused": "yes", "workspace_id": "w2",
+     "terminal_title_stripped": "rename config keys"},
+    {"pane_id": "w5:p1", "terminal_id": "t5", "agent_status": "working",
+     "workspace_id": "w5", "terminal_title_stripped": "wire up ci"}
+  ],
+  "expected": {
+    "order": ["working"],
+    "counts": {"working": 2},
+    "agents": {"working": ["w2:p1", "w5:p1"]},
+    "first_target": {"status": "working", "expect": "w2:p1"},
+    "cycle_target": {"status": "working", "expect": "w2:p1"}
+  }
+}

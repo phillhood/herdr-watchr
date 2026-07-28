@@ -102,7 +102,7 @@ def select_target(matching, click_action):
     if click_action != "cycle":
         return matching[0]
     for index, agent in enumerate(matching):
-        if agent.get("focused"):
+        if agent.get("focused") is True:
             return matching[(index + 1) % len(matching)]
     return matching[0]
 

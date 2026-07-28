@@ -87,6 +87,14 @@ class TestSelectTarget(unittest.TestCase):
         group = [{"pane_id": "a", "focused": True}, {"pane_id": "b"}]
         self.assertEqual(hw.select_target(group, None)["pane_id"], "a")
 
+    def test_a_string_focused_value_does_not_count_as_focused(self):
+        group = [{"pane_id": "a", "focused": "yes"}, {"pane_id": "b"}]
+        self.assertEqual(hw.select_target(group, "cycle")["pane_id"], "a")
+
+    def test_an_integer_focused_value_does_not_count_as_focused(self):
+        group = [{"pane_id": "a", "focused": 1}, {"pane_id": "b"}]
+        self.assertEqual(hw.select_target(group, "cycle")["pane_id"], "a")
+
 
 class TestNormalizeUrgency(unittest.TestCase):
     def test_a_permutation_is_accepted(self):
