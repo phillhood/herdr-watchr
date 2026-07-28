@@ -54,10 +54,13 @@ class TestInstallScript(unittest.TestCase):
 
     def test_the_printed_snippet_paths_exist(self):
         _target, proc = self.install()
+        checked = []
         for line in proc.stdout.splitlines():
             for word in line.split():
-                if word.startswith("/") and word.endswith((".jsonc", ".css")):
+                if word.startswith("/") and word.endswith((".jsonc", ".css", ".json")):
                     self.assertTrue(os.path.exists(word), word)
+                    checked.append(word)
+        self.assertEqual(len(checked), 3)
 
 
 class TestExampleWaybarConfig(unittest.TestCase):
