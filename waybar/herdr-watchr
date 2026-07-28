@@ -237,3 +237,63 @@ def fetch_agents(cfg):
     except Exception:
         return []
     return agents if isinstance(agents, list) else []
+
+
+def pick_herdr_window(clients, terminal):
+    title = terminal.get("title")
+    window_class = terminal.get("class")
+    if title:
+        for client in clients:
+            if client.get("title") == title:
+                return client
+    if window_class:
+        for client in clients:
+            if client.get("class") == window_class:
+                return client
+    return None
+
+
+def render_focus_cmd(template, addr):
+    if not template:
+        return []
+    return [str(part).replace("{addr}", addr) for part in template]
+
+
+def raise_terminal_window(cfg):
+    template = cfg.get("focus_window_cmd")
+    if not template:
+        return
+    try:
+        proc = subprocess.run(["hyprctl", "-j", "clients"],
+                              capture_output=True, text=True, timeout=3)
+        window = pick_herdr_window(json.loads(proc.stdout),
+                                   cfg.get("terminal") or {})
+        if not window or not window.get("address"):
+            return
+        subprocess.run(render_focus_cmd(template, window["address"]),
+                       capture_output=True, text=True, timeout=3)
+    except Exception as exc:
+        warn("cannot raise the terminal window: %s" % exc)
+
+
+def focus_agent(cfg, terminal_id):
+    if not terminal_id:
+        return
+    try:
+        subprocess.run([herdr_bin(cfg), "agent", "focus", terminal_id],
+                       capture_output=True, text=True, timeout=3)
+    except Exception as exc:
+        warn("cannot focus the agent: %s" % exc)
+    raise_terminal_window(cfg)
+
+
+def nudge(signal):
+    try:
+        argv = ["pkill", "-RTMIN+%d" % int(signal), "waybar"]
+    except (TypeError, ValueError):
+        warn("signal is not an integer: %s" % signal)
+        return
+    try:
+        subprocess.run(argv, capture_output=True)
+    except Exception as exc:
+        warn("cannot signal waybar: %s" % exc)
