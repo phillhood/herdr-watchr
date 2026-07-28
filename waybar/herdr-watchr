@@ -17,7 +17,11 @@ VOCABULARY = ("blocked", "idle", "done", "working", "unknown")
 
 
 def normalize_urgency(value):
-    if not isinstance(value, list) or sorted(value) != sorted(VOCABULARY):
+    if not isinstance(value, list):
+        return list(VOCABULARY)
+    if not all(isinstance(item, str) for item in value):
+        return list(VOCABULARY)
+    if sorted(value) != sorted(VOCABULARY):
         return list(VOCABULARY)
     return list(value)
 

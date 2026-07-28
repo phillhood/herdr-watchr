@@ -105,6 +105,16 @@ class TestNormalizeUrgency(unittest.TestCase):
         self.assertEqual(hw.normalize_urgency("blocked"), URGENCY)
         self.assertEqual(hw.normalize_urgency(None), URGENCY)
 
+    def test_a_mixed_type_list_is_rejected_without_raising(self):
+        self.assertEqual(
+            hw.normalize_urgency(["blocked", 1, "done", "working", "unknown"]),
+            URGENCY)
+
+    def test_a_list_with_an_unhashable_member_is_rejected_without_raising(self):
+        self.assertEqual(
+            hw.normalize_urgency(["blocked", ["x"], "done", "working", "unknown"]),
+            URGENCY)
+
 
 if __name__ == "__main__":
     unittest.main()
