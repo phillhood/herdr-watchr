@@ -4,6 +4,28 @@
   "title": "herdr-watchr configuration",
   "type": "object",
   "additionalProperties": false,
+  "$defs": {
+    "urgency": {
+      "type": "array",
+      "items": {"enum": ["blocked", "idle", "done", "working", "unknown"]},
+      "minItems": 5,
+      "maxItems": 5,
+      "uniqueItems": true
+    },
+    "colors": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "blocked": {"type": "string"},
+        "idle": {"type": "string"},
+        "done": {"type": "string"},
+        "working": {"type": "string"},
+        "unknown": {"type": "string"}
+      }
+    },
+    "poll_seconds": {"type": "number", "exclusiveMinimum": 0},
+    "herdr_bin": {"type": ["string", "null"]}
+  },
   "properties": {
     "urgency": {
       "type": "array",
@@ -30,6 +52,10 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
+        "urgency": {"$ref": "#/$defs/urgency"},
+        "colors": {"$ref": "#/$defs/colors"},
+        "poll_seconds": {"$ref": "#/$defs/poll_seconds"},
+        "herdr_bin": {"$ref": "#/$defs/herdr_bin"},
         "icons": {
           "type": "object",
           "additionalProperties": false,
@@ -62,6 +88,10 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
+        "urgency": {"$ref": "#/$defs/urgency"},
+        "colors": {"$ref": "#/$defs/colors"},
+        "poll_seconds": {"$ref": "#/$defs/poll_seconds"},
+        "herdr_bin": {"$ref": "#/$defs/herdr_bin"},
         "icons": {
           "type": "object",
           "additionalProperties": false,

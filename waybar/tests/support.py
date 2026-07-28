@@ -25,8 +25,12 @@ def schema_defaults(node):
     if "default" in node:
         return node["default"]
     if node.get("type") == "object" and "properties" in node:
-        return {key: schema_defaults(value)
-                for key, value in node["properties"].items()}
+        out = {}
+        for key, value in node["properties"].items():
+            if "$ref" in value:
+                continue
+            out[key] = schema_defaults(value)
+        return out
     return None
 
 

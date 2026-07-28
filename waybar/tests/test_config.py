@@ -181,5 +181,18 @@ class TestSchemaAgreesWithDefaults(ConfigCase):
         self.assertEqual(support.schema_defaults(support.load_schema()), hw.DEFAULTS)
 
 
+class TestSchemaPermitsHostSectionOverrides(ConfigCase):
+    def test_shared_keys_are_permitted_in_both_host_sections(self):
+        schema = support.load_schema()
+        for section in ("waybar", "macos"):
+            properties = schema["properties"][section]["properties"]
+            with self.subTest(section=section):
+                self.assertIn("colors", properties)
+                self.assertIn("urgency", properties)
+                self.assertIn("poll_seconds", properties)
+                self.assertIn("herdr_bin", properties)
+                self.assertFalse(schema["properties"][section]["additionalProperties"])
+
+
 if __name__ == "__main__":
     unittest.main()
