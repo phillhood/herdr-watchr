@@ -193,3 +193,37 @@ def poll_interval(cfg):
     except (TypeError, ValueError):
         return 1.5
     return max(value, 0.1)
+
+
+def pango_escape(text):
+    return (text.replace("&", "&amp;")
+                .replace("<", "&lt;")
+                .replace(">", "&gt;"))
+
+
+def agent_line(agent):
+    workspace = agent.get("workspace_id") or "?"
+    title = (agent.get("terminal_title_stripped") or "").strip()
+    return "%s  %s" % (pango_escape(workspace), pango_escape(title))
+
+
+def status_output(name, agents, cfg):
+    matching = group_agents(agents, cfg["urgency"]).get(name) or []
+    if not matching:
+        return {"text": "", "tooltip": "",
+                "class": ["herdr-watchr", name, "empty"]}
+    text = "<span color='%s'>%s</span> %d" % (
+        cfg["colors"][name], cfg["icons"][name], len(matching))
+    return {"text": text,
+            "tooltip": "\n".join(agent_line(a) for a in matching),
+            "class": ["herdr-watchr", name]}
+
+
+def state_signature(agents, urgency):
+    return tuple(sorted((a.get("pane_id") or "", status_of(a, urgency))
+                        for a in agents))
+
+
+def emit(payload):
+    sys.stdout.write(json.dumps(payload) + "\n")
+    sys.stdout.flush()
