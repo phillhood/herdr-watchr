@@ -227,3 +227,13 @@ def state_signature(agents, urgency):
 def emit(payload):
     sys.stdout.write(json.dumps(payload) + "\n")
     sys.stdout.flush()
+
+
+def fetch_agents(cfg):
+    try:
+        proc = subprocess.run([herdr_bin(cfg), "agent", "list"],
+                              capture_output=True, text=True, timeout=3)
+        agents = json.loads(proc.stdout).get("result", {}).get("agents")
+    except Exception:
+        return []
+    return agents if isinstance(agents, list) else []
