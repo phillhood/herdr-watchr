@@ -15,6 +15,56 @@ import time
 
 VOCABULARY = ("blocked", "idle", "done", "working", "unknown")
 
+HOST = "waybar"
+HOST_SECTIONS = ("waybar", "macos")
+
+DEFAULTS = {
+    "urgency": list(VOCABULARY),
+    "colors": {
+        "blocked": "#d64545",
+        "idle": "#4caf7d",
+        "done": "#3aa6a6",
+        "working": "#8b6fd4",
+        "unknown": "#7a7f8c",
+    },
+    "poll_seconds": 1.5,
+    "herdr_bin": None,
+    "waybar": {
+        "icons": {
+            "blocked": "\U000F009A",
+            "idle": "\U000F0134",
+            "done": "\U000F05E0",
+            "working": "\U000F06A9",
+            "unknown": "\U000F02D7",
+        },
+        "signal": 8,
+        "click_action": "first",
+        "terminal": {"class": "com.mitchellh.ghostty", "title": "herdr"},
+        "focus_window_cmd": ["hyprctl", "dispatch", "focuswindow",
+                             "address:{addr}"],
+    },
+    "macos": {
+        "icons": {
+            "blocked": "bell.fill",
+            "idle": "checkmark",
+            "done": "checkmark.circle.fill",
+            "working": "gearshape.fill",
+            "unknown": "questionmark.circle",
+        },
+        "terminal": {"bundle_id": "com.mitchellh.ghostty"},
+        "show_when_empty": True,
+    },
+}
+
+_WARNED = set()
+
+
+def warn(message):
+    if message in _WARNED:
+        return
+    _WARNED.add(message)
+    sys.stderr.write("herdr-watchr: %s\n" % message)
+
 
 def normalize_urgency(value):
     if not isinstance(value, list):
@@ -55,3 +105,78 @@ def select_target(matching, click_action):
         if agent.get("focused"):
             return matching[(index + 1) % len(matching)]
     return matching[0]
+
+
+def deep_merge(base, override):
+    merged = dict(base)
+    for key, value in (override or {}).items():
+        if isinstance(value, dict) and isinstance(merged.get(key), dict):
+            merged[key] = deep_merge(merged[key], value)
+        else:
+            merged[key] = value
+    return merged
+
+
+def config_path(env):
+    override = env.get("HERDR_WATCHR_CONFIG")
+    if override:
+        return override
+    base = env.get("XDG_CONFIG_HOME") or os.path.expanduser("~/.config")
+    return os.path.join(base, "herdr-watchr", "config.json")
+
+
+def read_config_file(path):
+    try:
+        with open(path, "r", encoding="utf-8") as fh:
+            data = json.load(fh)
+    except FileNotFoundError:
+        return {}
+    except Exception as exc:
+        warn("cannot read config %s: %s" % (path, exc))
+        return {}
+    if not isinstance(data, dict):
+        warn("config %s: top level must be an object" % path)
+        return {}
+    return data
+
+
+def apply_env(resolved, env):
+    binary = env.get("HERDR_WATCHR_BIN") or env.get("HERDR_BIN")
+    if binary:
+        resolved["herdr_bin"] = binary
+    poll = env.get("HERDR_WATCHR_POLL")
+    if poll:
+        try:
+            resolved["poll_seconds"] = float(poll)
+        except ValueError:
+            warn("HERDR_WATCHR_POLL is not a number: %s" % poll)
+    signal = env.get("HERDR_WATCHR_SIGNAL")
+    if signal:
+        try:
+            resolved["signal"] = int(signal)
+        except ValueError:
+            warn("HERDR_WATCHR_SIGNAL is not an integer: %s" % signal)
+    return resolved
+
+
+def load_config(env=None, host=HOST):
+    env = os.environ if env is None else env
+    merged = deep_merge(DEFAULTS, read_config_file(config_path(env)))
+    trunk = dict((k, v) for k, v in merged.items() if k not in HOST_SECTIONS)
+    resolved = deep_merge(trunk, merged.get(host) or {})
+    resolved["urgency"] = normalize_urgency(resolved.get("urgency"))
+    return apply_env(resolved, env)
+
+
+def herdr_bin(cfg):
+    return (cfg.get("herdr_bin")
+            or shutil.which("herdr")
+            or os.path.expanduser("~/.local/bin/herdr"))
+
+
+def poll_interval(cfg):
+    try:
+        value = float(cfg.get("poll_seconds", 1.5))
+    except (TypeError, ValueError):
+        return 1.5
+    return max(value, 0.1)
