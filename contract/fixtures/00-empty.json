@@ -1,0 +1,11 @@
+{
+  "name": "an empty agent list renders nothing",
+  "agents": [],
+  "expected": {
+    "order": [],
+    "counts": {},
+    "agents": {},
+    "first_target": {"status": "blocked", "expect": null},
+    "cycle_target": {"status": "blocked", "expect": null}
+  }
+}

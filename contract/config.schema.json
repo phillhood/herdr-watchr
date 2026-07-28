@@ -1,0 +1,87 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/phillhood/herdr-watchr/contract/config.schema.json",
+  "title": "herdr-watchr configuration",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "urgency": {
+      "type": "array",
+      "items": {"enum": ["blocked", "idle", "done", "working", "unknown"]},
+      "minItems": 5,
+      "maxItems": 5,
+      "uniqueItems": true,
+      "default": ["blocked", "idle", "done", "working", "unknown"]
+    },
+    "colors": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "blocked": {"type": "string", "default": "#d64545"},
+        "idle": {"type": "string", "default": "#4caf7d"},
+        "done": {"type": "string", "default": "#3aa6a6"},
+        "working": {"type": "string", "default": "#8b6fd4"},
+        "unknown": {"type": "string", "default": "#7a7f8c"}
+      }
+    },
+    "poll_seconds": {"type": "number", "exclusiveMinimum": 0, "default": 1.5},
+    "herdr_bin": {"type": ["string", "null"], "default": null},
+    "waybar": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "icons": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "blocked": {"type": "string", "default": "󰂚"},
+            "idle": {"type": "string", "default": "󰄴"},
+            "done": {"type": "string", "default": "󰗠"},
+            "working": {"type": "string", "default": "󰚩"},
+            "unknown": {"type": "string", "default": "󰋗"}
+          }
+        },
+        "signal": {"type": "integer", "minimum": 1, "maximum": 30, "default": 8},
+        "click_action": {"enum": ["first", "cycle"], "default": "first"},
+        "terminal": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "class": {"type": "string", "default": "com.mitchellh.ghostty"},
+            "title": {"type": "string", "default": "herdr"}
+          }
+        },
+        "focus_window_cmd": {
+          "type": ["array", "null"],
+          "items": {"type": "string"},
+          "default": ["hyprctl", "dispatch", "focuswindow", "address:{addr}"]
+        }
+      }
+    },
+    "macos": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "icons": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "blocked": {"type": "string", "default": "bell.fill"},
+            "idle": {"type": "string", "default": "checkmark"},
+            "done": {"type": "string", "default": "checkmark.circle.fill"},
+            "working": {"type": "string", "default": "gearshape.fill"},
+            "unknown": {"type": "string", "default": "questionmark.circle"}
+          }
+        },
+        "terminal": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "bundle_id": {"type": "string", "default": "com.mitchellh.ghostty"}
+          }
+        },
+        "show_when_empty": {"type": "boolean", "default": true}
+      }
+    }
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "name": "cycle in a single-agent group returns that agent",
+  "agents": [
+    {"pane_id": "w7:p1", "terminal_id": "t7", "agent_status": "done",
+     "focused": true, "workspace_id": "w7",
+     "terminal_title_stripped": "only one"}
+  ],
+  "expected": {
+    "order": ["done"],
+    "counts": {"done": 1},
+    "agents": {"done": ["w7:p1"]},
+    "first_target": {"status": "done", "expect": "w7:p1"},
+    "cycle_target": {"status": "done", "expect": "w7:p1"}
+  }
+}

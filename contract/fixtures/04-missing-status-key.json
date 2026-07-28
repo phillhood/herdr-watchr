@@ -1,0 +1,17 @@
+{
+  "name": "a missing or null status key maps to unknown",
+  "agents": [
+    {"pane_id": "w1:p1", "terminal_id": "t1", "focused": false,
+     "workspace_id": "w1", "terminal_title_stripped": "no status key"},
+    {"pane_id": "w2:p1", "terminal_id": "t2", "agent_status": null,
+     "focused": false, "workspace_id": "w2",
+     "terminal_title_stripped": "null status"}
+  ],
+  "expected": {
+    "order": ["unknown"],
+    "counts": {"unknown": 2},
+    "agents": {"unknown": ["w1:p1", "w2:p1"]},
+    "first_target": {"status": "unknown", "expect": "w1:p1"},
+    "cycle_target": {"status": "unknown", "expect": "w1:p1"}
+  }
+}

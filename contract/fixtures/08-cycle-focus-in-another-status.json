@@ -1,0 +1,21 @@
+{
+  "name": "cycle falls back to the first agent when the focused agent is elsewhere",
+  "agents": [
+    {"pane_id": "w1:p1", "terminal_id": "t1", "agent_status": "blocked",
+     "focused": false, "workspace_id": "w1",
+     "terminal_title_stripped": "needs review"},
+    {"pane_id": "w2:p1", "terminal_id": "t2", "agent_status": "blocked",
+     "focused": false, "workspace_id": "w2",
+     "terminal_title_stripped": "needs input"},
+    {"pane_id": "w3:p1", "terminal_id": "t3", "agent_status": "working",
+     "focused": true, "workspace_id": "w3",
+     "terminal_title_stripped": "running tests"}
+  ],
+  "expected": {
+    "order": ["blocked", "working"],
+    "counts": {"blocked": 2, "working": 1},
+    "agents": {"blocked": ["w1:p1", "w2:p1"], "working": ["w3:p1"]},
+    "first_target": {"status": "blocked", "expect": "w1:p1"},
+    "cycle_target": {"status": "blocked", "expect": "w1:p1"}
+  }
+}

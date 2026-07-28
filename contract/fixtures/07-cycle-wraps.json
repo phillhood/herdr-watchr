@@ -1,0 +1,18 @@
+{
+  "name": "cycle wraps from the last agent to the first",
+  "agents": [
+    {"pane_id": "w2:p1", "terminal_id": "t3", "agent_status": "blocked",
+     "focused": false, "workspace_id": "w2",
+     "terminal_title_stripped": "migrate schema"},
+    {"pane_id": "w5:p1", "terminal_id": "t9", "agent_status": "blocked",
+     "focused": true, "workspace_id": "w5",
+     "terminal_title_stripped": "fix auth redirect"}
+  ],
+  "expected": {
+    "order": ["blocked"],
+    "counts": {"blocked": 2},
+    "agents": {"blocked": ["w2:p1", "w5:p1"]},
+    "first_target": {"status": "blocked", "expect": "w2:p1"},
+    "cycle_target": {"status": "blocked", "expect": "w2:p1"}
+  }
+}

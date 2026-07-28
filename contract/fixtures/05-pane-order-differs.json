@@ -1,0 +1,21 @@
+{
+  "name": "agents sort lexicographically by pane id, not by array order",
+  "agents": [
+    {"pane_id": "w10:p1", "terminal_id": "t3", "agent_status": "idle",
+     "focused": false, "workspace_id": "w10",
+     "terminal_title_stripped": "third"},
+    {"pane_id": "w2:p2", "terminal_id": "t2", "agent_status": "idle",
+     "focused": false, "workspace_id": "w2",
+     "terminal_title_stripped": "second"},
+    {"pane_id": "w2:p1", "terminal_id": "t1", "agent_status": "idle",
+     "focused": false, "workspace_id": "w2",
+     "terminal_title_stripped": "first"}
+  ],
+  "expected": {
+    "order": ["idle"],
+    "counts": {"idle": 3},
+    "agents": {"idle": ["w10:p1", "w2:p1", "w2:p2"]},
+    "first_target": {"status": "idle", "expect": "w10:p1"},
+    "cycle_target": {"status": "idle", "expect": "w10:p1"}
+  }
+}
