@@ -107,13 +107,23 @@ def select_target(matching, click_action):
     return matching[0]
 
 
+def _copy(value):
+    if isinstance(value, dict):
+        return dict((key, _copy(item)) for key, item in value.items())
+    if isinstance(value, list):
+        return list(value)
+    return value
+
+
 def deep_merge(base, override):
-    merged = dict(base)
-    for key, value in (override or {}).items():
+    merged = dict((key, _copy(value)) for key, value in base.items())
+    if not isinstance(override, dict):
+        return merged
+    for key, value in override.items():
         if isinstance(value, dict) and isinstance(merged.get(key), dict):
             merged[key] = deep_merge(merged[key], value)
         else:
-            merged[key] = value
+            merged[key] = _copy(value)
     return merged
 
 
@@ -161,7 +171,10 @@ def apply_env(resolved, env):
 
 def load_config(env=None, host=HOST):
     env = os.environ if env is None else env
-    merged = deep_merge(DEFAULTS, read_config_file(config_path(env)))
+    file_data = read_config_file(config_path(env))
+    sane_sections = dict((key, value) for key, value in file_data.items()
+                         if key not in HOST_SECTIONS or isinstance(value, dict))
+    merged = deep_merge(DEFAULTS, sane_sections)
     trunk = dict((k, v) for k, v in merged.items() if k not in HOST_SECTIONS)
     resolved = deep_merge(trunk, merged.get(host) or {})
     resolved["urgency"] = normalize_urgency(resolved.get("urgency"))

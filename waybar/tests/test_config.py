@@ -46,6 +46,16 @@ class TestDeepMerge(ConfigCase):
     def test_a_null_override_is_a_no_op(self):
         self.assertEqual(hw.deep_merge({"a": 1}, None), {"a": 1})
 
+    def test_a_non_dict_override_is_ignored(self):
+        self.assertEqual(hw.deep_merge({"a": 1}, "oops"), {"a": 1})
+        self.assertEqual(hw.deep_merge({"a": 1}, ["b"]), {"a": 1})
+
+    def test_the_result_does_not_alias_nested_dicts_from_the_base(self):
+        base = {"colors": {"blocked": "#000"}}
+        merged = hw.deep_merge(base, {})
+        merged["colors"]["blocked"] = "#fff"
+        self.assertEqual(base["colors"]["blocked"], "#000")
+
 
 class TestResolution(ConfigCase):
     def test_defaults_apply_when_there_is_no_file(self):
@@ -138,6 +148,18 @@ class TestMalformedInput(ConfigCase):
         hw.load_config(env=env)
         hw.load_config(env=env)
         self.assertEqual(len(hw._WARNED), 1)
+
+    def test_a_non_dict_host_section_falls_back_to_defaults(self):
+        cfg = hw.load_config(env=self.with_config({"waybar": "oops"}))
+        self.assertEqual(cfg["signal"], 8)
+        self.assertEqual(cfg["click_action"], "first")
+
+    def test_a_resolved_config_does_not_alias_module_defaults(self):
+        cfg = hw.load_config(env=MISSING)
+        self.assertIsNot(cfg["colors"], hw.DEFAULTS["colors"])
+        cfg["colors"]["blocked"] = "CORRUPTED"
+        self.assertEqual(hw.DEFAULTS["colors"]["blocked"], "#d64545")
+        self.assertEqual(hw.load_config(env=MISSING)["colors"]["blocked"], "#d64545")
 
 
 class TestPollInterval(ConfigCase):
