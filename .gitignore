@@ -1,0 +1,12 @@
+.dev
+.docs
+
+__pycache__/
+*.pyc
+.pytest_cache/
+
+.build/
+.DS_Store
+
+*.bak
+*.swp
