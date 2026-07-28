@@ -297,3 +297,64 @@ def nudge(signal):
         subprocess.run(argv, capture_output=True)
     except Exception as exc:
         warn("cannot signal waybar: %s" % exc)
+
+
+USAGE = "usage: herdr-watchr {status <name>|focus-status <name>|notify}\n"
+
+
+def cmd_status(name):
+    try:
+        cfg = load_config()
+        payload = status_output(name, fetch_agents(cfg), cfg)
+    except Exception as exc:
+        warn("cannot render status %s: %s" % (name, exc))
+        payload = {"text": "", "tooltip": "",
+                   "class": ["herdr-watchr", name, "empty"]}
+    emit(payload)
+
+
+def cmd_focus_status(name):
+    try:
+        cfg = load_config()
+        matching = group_agents(fetch_agents(cfg), cfg["urgency"]).get(name) or []
+        target = select_target(matching, cfg.get("click_action"))
+    except Exception as exc:
+        warn("cannot focus status %s: %s" % (name, exc))
+        return
+    if target:
+        focus_agent(cfg, target.get("terminal_id"))
+
+
+def cmd_notify():
+    emit({"text": "", "tooltip": "", "class": ["herdr-watchr", "notify"]})
+    cfg = load_config()
+    last = None
+    while True:
+        try:
+            cfg = load_config()
+            signature = state_signature(fetch_agents(cfg), cfg["urgency"])
+            if signature != last:
+                last = signature
+                nudge(cfg.get("signal", 8))
+        except Exception as exc:
+            warn("notify: %s" % exc)
+        time.sleep(poll_interval(cfg))
+
+
+def main(argv):
+    command = argv[1] if len(argv) > 1 else "notify"
+    if command == "status" and len(argv) > 2:
+        cmd_status(argv[2])
+        return 0
+    if command == "focus-status" and len(argv) > 2:
+        cmd_focus_status(argv[2])
+        return 0
+    if command == "notify":
+        cmd_notify()
+        return 0
+    sys.stderr.write(USAGE)
+    return 2
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv))
