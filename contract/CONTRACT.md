@@ -75,7 +75,7 @@ expected outcome.
 `agents` maps a status to its `pane_id`s in contract order. `first_target` and
 `cycle_target` each name a status to query and the `pane_id` expected back;
 `"expect": null` means the group is empty and nothing is selected. Both target
-keys are optional.
+keys are required, and `expected` carries no other keys.
 
 ## Configuration
 

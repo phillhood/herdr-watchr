@@ -3,7 +3,7 @@ import unittest
 import support
 
 REQUIRED_TOP = {"name", "agents", "expected"}
-REQUIRED_EXPECTED = {"order", "counts", "agents"}
+REQUIRED_EXPECTED = {"order", "counts", "agents", "first_target", "cycle_target"}
 VOCABULARY = {"blocked", "idle", "done", "working", "unknown"}
 
 
@@ -19,6 +19,11 @@ class TestFixtureShape(unittest.TestCase):
             with self.subTest(fixture=path.name):
                 self.assertTrue(REQUIRED_TOP.issubset(data))
                 self.assertTrue(REQUIRED_EXPECTED.issubset(data["expected"]))
+
+    def test_no_fixture_has_an_unknown_expected_key(self):
+        for path, data in self.fixtures:
+            with self.subTest(fixture=path.name):
+                self.assertTrue(set(data["expected"]).issubset(REQUIRED_EXPECTED))
 
     def test_order_counts_and_agents_name_the_same_statuses(self):
         for path, data in self.fixtures:
