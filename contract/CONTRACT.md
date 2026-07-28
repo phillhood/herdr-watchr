@@ -25,8 +25,11 @@ and a missing key all map to `unknown`. The comparison is case-sensitive:
 Statuses render in `urgency` order. A status whose count is zero renders
 nothing at all.
 
-`urgency` is configurable, but only as a permutation: a list that is not exactly
-the five vocabulary members is rejected and the default order is used.
+`urgency` is configurable, but only as a permutation: a value is accepted only
+if it has exactly five entries forming a permutation of the vocabulary — not
+merely the same five members as a set, so a six-entry list with one repeated
+member is rejected, not silently deduplicated. Anything else is rejected and
+the default order is used.
 
 The hosts reach the zero-count end state differently — waybar emits an empty
 `text` and lets `hide-empty-text` collapse the module, macOS omits the segment
@@ -37,6 +40,10 @@ from its attributed title. The contract binds the outcome, not the mechanism.
 Stable sort by `pane_id` ascending, comparing the raw string. `pane_id` looks
 like `w10:p1`, so the ordering is lexicographic, not numeric: `w10:p1` sorts
 before `w2:p1`.
+
+A missing or null `pane_id` sorts as the empty string, so such an agent sorts
+first within its status. Ties — including two agents that both lack a
+`pane_id` — keep their input order, since the sort is stable.
 
 This is what stops a status's first agent jumping when an unrelated agent
 changes state, and it is load-bearing for click targeting.
@@ -53,6 +60,16 @@ Given a status group already in contract order, and `click_action`:
 - An empty group selects nothing.
 
 Any `click_action` value other than `cycle` behaves as `first`.
+
+`focused` counts only when its value is the boolean `true`; any other truthy
+value (a non-empty string, a non-zero number) does not select the agent. If
+more than one agent in a group is focused, the first one in contract order
+wins.
+
+The selected agent's `pane_id` identifies and orders it within the group, but
+`pane_id` is not the handle used to act on it. Focusing an agent means calling
+`herdr agent focus <terminal_id>` with the selected agent's `terminal_id`, a
+separate field.
 
 ## Fixture format
 
@@ -90,3 +107,27 @@ shared key, which is how a different palette per platform works.
 
 Neither host treats a validation failure as fatal. A malformed config warns once
 and falls back to defaults.
+
+Both hosts read the same file: `$XDG_CONFIG_HOME/herdr-watchr/config.json`,
+falling back to `~/.config/herdr-watchr/config.json` when `XDG_CONFIG_HOME` is
+unset. This path is not platform-specific — a macOS host that instead reads
+`~/Library/Application Support/…` is not sharing a config file with waybar, it
+only appears to.
+
+Four env vars participate in resolution:
+
+| Env var | Overrides |
+|---|---|
+| `HERDR_WATCHR_CONFIG` | The config file path |
+| `HERDR_WATCHR_BIN`, falling back to `HERDR_BIN` | `herdr_bin` |
+| `HERDR_WATCHR_POLL` | `poll_seconds` |
+| `HERDR_WATCHR_SIGNAL` | `waybar.signal` |
+
+A GUI app launched from Finder or as a LaunchAgent inherits no shell
+environment. The macOS host reads these vars when present but must not depend
+on them.
+
+The fully resolved config is flat: the host section is merged over the shared
+trunk and the host-section keys are then removed from the result, so a
+resolved config has `signal` at the top level, not under `waybar`, and carries
+no `waybar` or `macos` key at all.
