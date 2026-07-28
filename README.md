@@ -51,10 +51,18 @@ on change is the honest approach, and it avoids a busy timer on every module.
 
 ## Configuration
 
-`~/.config/herdr-watchr/config.json`, validated against
-[`contract/config.schema.json`](contract/config.schema.json). Nothing here is
-required; every key falls back to a default. A malformed file warns once on
-stderr and is ignored.
+`~/.config/herdr-watchr/config.json`. Every key is optional and falls back to a
+default. [`contract/config.schema.json`](contract/config.schema.json) is the
+normative description of the config surface and the source of truth for those
+defaults.
+
+The script does not check your file against that schema — it ships standard
+library only and carries no JSON Schema validator. What it does check: a file
+that will not parse, or whose top level is not an object, warns once on stderr
+and is ignored; a `waybar` or `macos` section that is not an object is dropped;
+and `urgency` is used only if it is a permutation of the five statuses.
+Anything else — an out-of-range `signal`, an unrecognised `click_action`, an
+unknown key — is accepted as written.
 
 Shared keys sit at the top level, host-specific keys are namespaced, and
 resolution runs env var → host section → shared trunk → built-in default,
