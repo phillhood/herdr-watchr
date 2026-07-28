@@ -1,0 +1,53 @@
+#!/usr/bin/env python3
+"""herdr-watchr - live herdr agent status in waybar.
+
+Subcommands:
+  status <name>        emit one status module's JSON and exit
+  focus-status <name>  focus an agent in <name> and raise the terminal window
+  notify               poll herdr and signal waybar when the rendered state changes
+"""
+import json
+import os
+import shutil
+import subprocess
+import sys
+import time
+
+VOCABULARY = ("blocked", "idle", "done", "working", "unknown")
+
+
+def normalize_urgency(value):
+    if not isinstance(value, list) or sorted(value) != sorted(VOCABULARY):
+        return list(VOCABULARY)
+    return list(value)
+
+
+def status_of(agent, urgency):
+    value = agent.get("agent_status") or "unknown"
+    return value if value in urgency else "unknown"
+
+
+def stable_sort(agents):
+    return sorted(agents, key=lambda a: a.get("pane_id") or "")
+
+
+def group_agents(agents, urgency):
+    groups = dict((name, []) for name in urgency)
+    for agent in agents:
+        groups[status_of(agent, urgency)].append(agent)
+    return dict((name, stable_sort(groups[name])) for name in urgency)
+
+
+def status_order(groups, urgency):
+    return [name for name in urgency if groups.get(name)]
+
+
+def select_target(matching, click_action):
+    if not matching:
+        return None
+    if click_action != "cycle":
+        return matching[0]
+    for index, agent in enumerate(matching):
+        if agent.get("focused"):
+            return matching[(index + 1) % len(matching)]
+    return matching[0]

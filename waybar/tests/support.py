@@ -1,3 +1,5 @@
+import importlib.machinery
+import importlib.util
 import json
 import pathlib
 
@@ -26,3 +28,15 @@ def schema_defaults(node):
         return {key: schema_defaults(value)
                 for key, value in node["properties"].items()}
     return None
+
+
+SCRIPT = ROOT / "waybar" / "herdr-watchr"
+
+
+def load_script():
+    loader = importlib.machinery.SourceFileLoader("herdr_watchr", str(SCRIPT))
+    spec = importlib.util.spec_from_file_location("herdr_watchr", SCRIPT,
+                                                  loader=loader)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
