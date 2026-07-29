@@ -2,8 +2,10 @@ import importlib.machinery
 import importlib.util
 import json
 import pathlib
+import sys
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT / "waybar"))
 FIXTURE_DIR = ROOT / "contract" / "fixtures"
 SCHEMA = ROOT / "contract" / "config.schema.json"
 
