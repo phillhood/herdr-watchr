@@ -96,8 +96,14 @@ keys are required, and `expected` carries no other keys.
 
 ## Configuration
 
-`config.schema.json` describes every setting and carries its default value. Both
-hosts resolve configuration in this order, highest first:
+`config.schema.json` describes every setting and carries its default value. It is
+**advisory**: it documents the surface and is the single source of the defaults,
+and no host rejects a config for violating it. A host must not enforce
+`additionalProperties`, the `signal` range, or the `click_action` enum — an
+unknown key or an out-of-range value is accepted as written, and a host that
+rejected it would disagree with the other about which configs are usable.
+
+Both hosts resolve configuration in this order, highest first:
 
     env var  ->  host section  ->  shared trunk  ->  built-in default
 

@@ -91,9 +91,11 @@ other five to re-render, rather than each running its own timer.
 
 `~/.config/herdr-watchr/config.json`, every key optional.
 [`contract/config.schema.json`](contract/config.schema.json) describes the whole
-surface and holds the defaults below. Nothing validates your file against it, so
-an out-of-range `signal` or an unknown key is accepted as written; a file that
-will not parse warns once on stderr and is ignored.
+surface and holds the defaults below. The schema is advisory by design — nothing
+validates your file against it, so an out-of-range `signal` or an unknown key is
+accepted as written. A file that will not parse, a non-object top level, and a
+host section that is not an object each warn once on stderr and fall back to
+defaults.
 
 Resolution runs env var → host section → shared trunk → built-in default,
 deep-merged per key, so `{"colors": {"blocked": "#ff0000"}}` recolours one status
