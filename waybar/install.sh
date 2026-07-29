@@ -36,14 +36,25 @@ done
 
 stamp="$(date +%s)"
 
-remove_binary() {
+dest_is_ours() {
   if [ -L "$dest" ] && [ "$(readlink -f "$dest")" = "$(readlink -f "$src")" ]; then
+    return 0
+  fi
+  if [ -f "$dest" ] && [ ! -L "$dest" ] && cmp -s "$dest" "$src"; then
+    return 0
+  fi
+  return 1
+}
+
+dest_exists() {
+  [ -e "$dest" ] || [ -L "$dest" ]
+}
+
+remove_binary() {
+  if dest_is_ours; then
     rm -f "$dest"
     printf 'removed %s\n' "$dest"
-  elif [ -f "$dest" ] && cmp -s "$dest" "$src"; then
-    rm -f "$dest"
-    printf 'removed %s\n' "$dest"
-  elif [ -e "$dest" ]; then
+  elif dest_exists; then
     printf 'left %s in place; it was not installed by this script\n' "$dest" >&2
   fi
 }
@@ -59,6 +70,11 @@ case "$position" in
   left|center|right) ;;
   *) printf 'install.sh: position must be left, center or right\n' >&2; exit 2 ;;
 esac
+
+if dest_exists && ! dest_is_ours && [ -z "$force_flag" ]; then
+  printf '%s exists and was not installed by this script; pass --force to replace it\n' "$dest" >&2
+  exit 1
+fi
 
 mkdir -p "$dest_dir"
 if [ "$mode" = copy ]; then

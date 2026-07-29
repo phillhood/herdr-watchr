@@ -117,6 +117,41 @@ class TestInstallScript(unittest.TestCase):
         self.run_installer(target, "--uninstall")
         self.assertTrue(os.path.exists(os.path.join(target, "herdr-watchr")))
 
+    def test_a_foreign_binary_is_not_replaced(self):
+        target = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, target)
+        foreign = os.path.join(target, "herdr-watchr")
+        with open(foreign, "w") as fh:
+            fh.write("#!/bin/sh\necho not ours\n")
+        proc = self.run_installer(target)
+        self.assertEqual(proc.returncode, 1)
+        with open(foreign) as fh:
+            self.assertIn("not ours", fh.read())
+
+    def test_a_foreign_binary_refusal_leaves_the_config_untouched(self):
+        target = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, target)
+        with open(os.path.join(target, "herdr-watchr"), "w") as fh:
+            fh.write("#!/bin/sh\necho not ours\n")
+        self.run_installer(target)
+        self.assertEqual(self.read("config.jsonc"), STOCK_CONFIG)
+
+    def test_force_replaces_a_foreign_binary(self):
+        target = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, target)
+        with open(os.path.join(target, "herdr-watchr"), "w") as fh:
+            fh.write("#!/bin/sh\necho not ours\n")
+        proc = self.run_installer(target, "--force")
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        self.assertTrue(os.path.islink(os.path.join(target, "herdr-watchr")))
+
+    def test_reinstalling_over_our_own_copy_is_allowed(self):
+        target = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, target)
+        self.run_installer(target, "--copy")
+        proc = self.run_installer(target, "--copy")
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+
     def test_an_unknown_position_exits_two(self):
         _target, proc = self.install("--position", "sideways")
         self.assertEqual(proc.returncode, 2)

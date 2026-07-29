@@ -38,7 +38,7 @@ you with no bar at all. The installer signals waybar and tells you to restart.
 |---|---|
 | `--position left\|center\|right` | Which `modules-*` list the group joins. Default `center` |
 | `--copy` | Copy the script instead of symlinking it |
-| `--force` | Proceed even if the config already wires herdr-watchr by hand |
+| `--force` | Proceed when the config already wires herdr-watchr by hand, or when the install path holds a binary this script did not put there |
 | `--uninstall` | Remove every change, restoring your files byte-for-byte |
 
 Set `HERDR_WATCHR_PREFIX` to install the binary somewhere other than `~/.local/bin`.
