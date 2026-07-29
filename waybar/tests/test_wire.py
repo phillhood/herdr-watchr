@@ -280,6 +280,34 @@ class TestAdversarialShapes(unittest.TestCase):
         with self.assertRaises(wire.ScanError):
             self.install(DUPLICATE_INCLUDE)
 
+    def test_a_marker_inside_a_string_before_the_splice_is_ignored(self):
+        text = ('{"note": "%s", "modules-center": ["clock"]}' % wire.GRP_OPEN)
+        out = self.install(text)
+        self.assertEqual(wire.config_uninstall(out), text)
+
+    def test_a_complete_marker_pair_inside_a_string_is_ignored(self):
+        text = ('{"note": "%sx%s", "modules-center": ["clock"]}'
+                % (wire.GRP_OPEN, wire.GRP_CLOSE))
+        out = self.install(text)
+        self.assertEqual(wire.config_uninstall(out), text)
+
+    def test_an_include_marker_inside_a_string_is_ignored(self):
+        text = ('{"note": "%s", "modules-center": ["clock"]}' % wire.MARK_OPEN)
+        out = self.install(text)
+        self.assertEqual(wire.config_uninstall(out), text)
+
+    def test_comment_marks_ignores_string_contents(self):
+        text = '{"a": "%s"}' % wire.GRP_OPEN
+        self.assertEqual(wire.comment_marks(text, wire.GRP_OPEN), [])
+
+    def test_comment_marks_finds_a_real_comment(self):
+        text = '{%s"a": 1}' % wire.GRP_OPEN
+        self.assertEqual(wire.comment_marks(text, wire.GRP_OPEN), [1])
+
+    def test_a_string_marker_does_not_suppress_manual_detection(self):
+        text = '{"note": "%s", "x": "group/herdr-watchr"}' % wire.GRP_OPEN
+        self.assertTrue(wire.manual_install_present(text))
+
     def test_value_offsets_finds_every_depth_one_match(self):
         self.assertEqual(len(wire.value_offsets(DUPLICATE_MODULES,
                                                 "modules-center")), 2)

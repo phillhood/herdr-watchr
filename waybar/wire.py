@@ -127,14 +127,34 @@ def matching_bracket(text, start):
 HERE = os.path.dirname(os.path.abspath(__file__))
 EXAMPLE_CSS = os.path.join(HERE, "examples", "style.css")
 
+def comment_marks(text, mark):
+    found = []
+    i = 0
+    try:
+        while i < len(text):
+            if _is_comment(text, i):
+                if text.startswith(mark, i):
+                    found.append(i)
+                i = _end_of_comment(text, i)
+                continue
+            if text[i] == '"':
+                i = _end_of_string(text, i)
+                continue
+            i += 1
+    except ScanError:
+        return []
+    return found
+
+
 def _cut_span(text, open_mark, close_mark, eat_newline=False):
-    start = text.find(open_mark)
-    if start < 0:
+    opens = comment_marks(text, open_mark)
+    if not opens:
         return text
-    end = text.find(close_mark, start)
-    if end < 0:
+    start = opens[0]
+    closes = [c for c in comment_marks(text, close_mark) if c > start]
+    if not closes:
         return text
-    end += len(close_mark)
+    end = closes[0] + len(close_mark)
     if eat_newline:
         if text[end:end + 2] == "\r\n":
             end += 2
@@ -151,7 +171,7 @@ def config_uninstall(text):
 
 def manual_install_present(text):
     for mark in (MARK_OPEN, INC_OPEN, GRP_OPEN):
-        if mark in text:
+        if comment_marks(text, mark):
             return False
     return "herdr-watchr" in text
 
