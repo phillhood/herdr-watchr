@@ -22,58 +22,35 @@ Empty statuses hide; the whole card collapses when no agents are running.
 git clone https://github.com/phillhood/herdr-watchr
 cd herdr-watchr
 ./waybar/install.sh
+pkill -x waybar && waybar &
 ```
 
-That symlinks `herdr-watchr` into `~/.local/bin`. Pass `--copy` to copy instead,
-or set `HERDR_WATCHR_PREFIX` to install somewhere else.
+That installs the binary to `~/.local/bin`, writes `herdr-watchr.jsonc` and
+`herdr-watchr.css` into your waybar config directory, and wires both into your
+`config.jsonc` and `style.css`. Your files are backed up first and only ever gain
+marker-delimited lines, so comments and formatting survive.
 
-**Use the absolute path in waybar, not the bare command.** waybar runs modules
-with the environment it was launched from, which for a compositor autostart or a
-display manager routinely excludes `~/.local/bin` — even when your interactive
-shell has it. A bare `herdr-watchr` then resolves to nothing and the modules
-simply never appear, with no error in the bar. The installer prints the exact
-line to use; the examples below assume the default `~/.local/bin`.
+The restart is separate on purpose: `SIGUSR2` reloads styling but does not start
+newly added modules, and killing a bar that has no respawn supervisor would leave
+you with no bar at all. The installer signals waybar and tells you to restart.
 
-Then wire up waybar, in three edits to `~/.config/waybar/`:
+| Flag | Effect |
+|---|---|
+| `--position left\|center\|right` | Which `modules-*` list the group joins. Default `center` |
+| `--copy` | Copy the script instead of symlinking it |
+| `--force` | Proceed even if the config already wires herdr-watchr by hand |
+| `--uninstall` | Remove every change, restoring your files byte-for-byte |
 
-**1. Add the group and its six modules** to `config.jsonc`. Copy them from
-[`waybar/examples/waybar-config.jsonc`](waybar/examples/waybar-config.jsonc) —
-one hidden watcher plus five status modules, all following the same shape:
+Set `HERDR_WATCHR_PREFIX` to install the binary somewhere other than `~/.local/bin`.
 
-```jsonc
-"group/herdr-watchr": {
-  "orientation": "inherit",
-  "modules": [
-    "custom/herdr-watchr-notify",
-    "custom/herdr-blocked",
-    "custom/herdr-idle",
-    "custom/herdr-done",
-    "custom/herdr-working",
-    "custom/herdr-unknown"
-  ]
-},
+The installer refuses, changing nothing, whenever it cannot be certain: no waybar
+config, a multi-bar config, a missing `modules-*` list, an `include` that is a
+string rather than an array, or a file it cannot parse. In each case it says what
+to add by hand — see [`waybar/examples/`](waybar/examples/) for the full snippets.
 
-"custom/herdr-blocked": {
-  "exec": "~/.local/bin/herdr-watchr status blocked",
-  "return-type": "json",
-  "format": "{}",
-  "hide-empty-text": true,
-  "tooltip": true,
-  "signal": 8,
-  "on-click": "~/.local/bin/herdr-watchr focus-status blocked"
-}
-```
-
-**2. Add `"group/herdr-watchr"`** to one of your `modules-left`,
-`modules-center` or `modules-right` lists.
-
-**3. Append [`waybar/examples/style.css`](waybar/examples/style.css)** to your
-stylesheet. Keep the padding on the child selectors rather than moving it up to
-`#herdr-watchr` — that is what lets the card collapse when every status is
-empty.
-
-Then reload waybar — `pkill -SIGUSR2 waybar`, or restart it if the modules don't
-appear.
+If your `config.jsonc` is a symlink into a dotfiles repo, the installer follows it,
+edits the real file in place, and prints the path it actually changed. The symlink
+survives, so stow stays intact.
 
 ## Subcommands
 
