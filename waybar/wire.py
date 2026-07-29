@@ -148,12 +148,13 @@ def comment_marks(text, mark):
 
 def _cut_span(text, open_mark, close_mark, eat_newline=False):
     opens = comment_marks(text, open_mark)
-    if not opens:
+    closes = comment_marks(text, close_mark)
+    if not opens and not closes:
         return text
+    if len(opens) != 1 or len(closes) != 1 or closes[0] < opens[0]:
+        raise ScanError("herdr-watchr markers in this file are damaged; "
+                        "remove them by hand, then run this again")
     start = opens[0]
-    closes = [c for c in comment_marks(text, close_mark) if c > start]
-    if not closes:
-        return text
     end = closes[0] + len(close_mark)
     if eat_newline:
         if text[end:end + 2] == "\r\n":

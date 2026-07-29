@@ -308,6 +308,31 @@ class TestAdversarialShapes(unittest.TestCase):
         text = '{"note": "%s", "x": "group/herdr-watchr"}' % wire.GRP_OPEN
         self.assertTrue(wire.manual_install_present(text))
 
+    def test_an_unmatched_open_marker_is_refused(self):
+        text = '%s\n{"modules-center": ["clock"]}' % wire.MARK_OPEN
+        with self.assertRaises(wire.ScanError):
+            self.install(text)
+
+    def test_an_unmatched_close_marker_is_refused(self):
+        text = '%s\n{"modules-center": ["clock"]}' % wire.MARK_CLOSE
+        with self.assertRaises(wire.ScanError):
+            self.install(text)
+
+    def test_a_duplicated_open_marker_is_refused(self):
+        text = '%s%s\n{"modules-center": ["clock"]}' % (wire.GRP_OPEN, wire.GRP_OPEN)
+        with self.assertRaises(wire.ScanError):
+            self.install(text)
+
+    def test_a_close_before_its_open_is_refused(self):
+        text = '%s%s\n{"modules-center": ["clock"]}' % (wire.GRP_CLOSE, wire.GRP_OPEN)
+        with self.assertRaises(wire.ScanError):
+            self.install(text)
+
+    def test_uninstall_refuses_a_damaged_marker_pair(self):
+        text = '%s\n{"modules-center": ["clock"]}' % wire.GRP_OPEN
+        with self.assertRaises(wire.ScanError):
+            wire.config_uninstall(text)
+
     def test_value_offsets_finds_every_depth_one_match(self):
         self.assertEqual(len(wire.value_offsets(DUPLICATE_MODULES,
                                                 "modules-center")), 2)
