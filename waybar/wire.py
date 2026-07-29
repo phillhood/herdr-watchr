@@ -112,6 +112,57 @@ def matching_bracket(text, start):
     raise ScanError("unbalanced %s" % open_c)
 
 
+INCLUDE_BLOCK_RE = re.compile(
+    "\n  " + re.escape(MARK_OPEN) + "\n  \"include\": \\[\"[^\"]*\"\\],\n  " +
+    re.escape(MARK_CLOSE) + "\n")
+INCLUDE_ELEM_RE = re.compile("\"[^\"]*\" " + re.escape(INCLUDE_MARK) + ", ?")
+GROUP_ENTRY_RE = re.compile(
+    ",? ?\"" + re.escape(GROUP) + "\" " + re.escape(GROUP_MARK))
+
+
+def config_uninstall(text):
+    text = INCLUDE_BLOCK_RE.sub("", text, count=1)
+    text = INCLUDE_ELEM_RE.sub("", text, count=1)
+    return GROUP_ENTRY_RE.sub("", text, count=1)
+
+
+def manual_install_present(text):
+    if MARK_OPEN in text or INCLUDE_MARK in text or GROUP_MARK in text:
+        return False
+    return "herdr-watchr" in text
+
+
+def config_install(text, include_path, position):
+    if position not in POSITIONS:
+        raise ScanError("position must be one of %s" % ", ".join(POSITIONS))
+    text = config_uninstall(text)
+    open_at = top_level_open(text)
+    include_at = value_offset(text, "include")
+    if include_at is None:
+        block = "\n  %s\n  \"include\": [\"%s\"],\n  %s\n" % (
+            MARK_OPEN, include_path, MARK_CLOSE)
+        text = text[:open_at + 1] + block + text[open_at + 1:]
+    elif text[include_at] == "[":
+        close = matching_bracket(text, include_at)
+        element = "\"%s\" %s" % (include_path, INCLUDE_MARK)
+        if _last_content(text, include_at + 1, close) >= 0:
+            element += ", "
+        text = text[:include_at + 1] + element + text[include_at + 1:]
+    else:
+        raise ScanError("include is not an array; add the include entry by hand")
+
+    key = "modules-%s" % position
+    array_at = value_offset(text, key)
+    if array_at is None or text[array_at] != "[":
+        raise ScanError("%s is not an array in this config" % key)
+    close = matching_bracket(text, array_at)
+    last = _last_content(text, array_at + 1, close)
+    entry = "\"%s\" %s" % (GROUP, GROUP_MARK)
+    if last < 0:
+        return text[:array_at + 1] + entry + text[array_at + 1:]
+    return text[:last + 1] + ", " + entry + text[last + 1:]
+
+
 def css_install(text, css_path):
     line = '%s @import url("%s"); %s\n' % (CSS_OPEN, css_path, CSS_CLOSE)
     return line + css_uninstall(text)

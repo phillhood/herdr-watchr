@@ -8,6 +8,49 @@ import wire
 EXAMPLES = pathlib.Path(support.ROOT) / "waybar" / "examples"
 
 
+def _strip(text):
+    out = []
+    i = 0
+    while i < len(text):
+        if wire._is_comment(text, i):
+            i = wire._end_of_comment(text, i)
+            continue
+        if text[i] == '"':
+            j = wire._end_of_string(text, i)
+            out.append(text[i:j])
+            i = j
+            continue
+        out.append(text[i])
+        i += 1
+    return "".join(out)
+
+
+PRETTY = '''{
+  "modules-center": [
+    "clock"
+  ],
+  "clock": {"format": "{:%H:%M}"}
+}
+'''
+
+SINGLE_LINE = '{"modules-center": ["clock"], "clock": {}}'
+
+EMPTY_LIST = '{"modules-center": [], "clock": {}}'
+
+WITH_COMMENT = '''{
+  // "modules-center": ["decoy"]
+  "modules-center": ["clock"],
+  "group/x": {"modules": ["a"]}
+}
+'''
+
+INCLUDE_ARRAY = '{"include": ["/a.jsonc"], "modules-center": ["clock"]}'
+
+INCLUDE_STRING = '{"include": "/a.jsonc", "modules-center": ["clock"]}'
+
+CORPUS = (PRETTY, SINGLE_LINE, EMPTY_LIST, WITH_COMMENT, INCLUDE_ARRAY)
+
+
 class TestStringScan(unittest.TestCase):
     def test_it_returns_the_index_past_the_closing_quote(self):
         self.assertEqual(wire._end_of_string('"ab" x', 0), 4)
@@ -124,6 +167,84 @@ class TestCssSplice(unittest.TestCase):
 
     def test_uninstall_on_an_untouched_file_changes_nothing(self):
         self.assertEqual(wire.css_uninstall(self.ORIGINAL), self.ORIGINAL)
+
+
+class TestConfigSplice(unittest.TestCase):
+    def install(self, text, position="center"):
+        return wire.config_install(text, "/w/herdr-watchr.jsonc", position)
+
+    def test_the_group_lands_in_the_named_list(self):
+        out = self.install(PRETTY)
+        arr = wire.value_offset(out, "modules-center")
+        close = wire.matching_bracket(out, arr)
+        self.assertIn(wire.GROUP, out[arr:close])
+
+    def test_the_include_is_added_when_absent(self):
+        out = self.install(PRETTY)
+        self.assertEqual(
+            json.loads(_strip(out))["include"], ["/w/herdr-watchr.jsonc"])
+
+    def test_it_appends_to_an_existing_include_array(self):
+        out = self.install(INCLUDE_ARRAY)
+        self.assertEqual(json.loads(_strip(out))["include"],
+                         ["/w/herdr-watchr.jsonc", "/a.jsonc"])
+
+    def test_an_include_string_is_refused(self):
+        with self.assertRaises(wire.ScanError):
+            self.install(INCLUDE_STRING)
+
+    def test_a_missing_position_key_is_refused(self):
+        with self.assertRaises(wire.ScanError):
+            self.install(PRETTY, "left")
+
+    def test_an_unknown_position_is_refused(self):
+        with self.assertRaises(wire.ScanError):
+            self.install(PRETTY, "sideways")
+
+    def test_the_decoy_in_a_comment_is_not_touched(self):
+        out = self.install(WITH_COMMENT)
+        self.assertIn('// "modules-center": ["decoy"]', out)
+
+    def test_a_nested_modules_key_is_not_touched(self):
+        out = self.install(WITH_COMMENT)
+        self.assertIn('"group/x": {"modules": ["a"]}', out)
+
+    def test_every_corpus_entry_stays_parseable(self):
+        for text in CORPUS:
+            out = self.install(text)
+            parsed = json.loads(_strip(out))
+            self.assertIn(wire.GROUP, parsed["modules-center"])
+
+    def test_uninstall_restores_every_corpus_entry_byte_for_byte(self):
+        for text in CORPUS:
+            self.assertEqual(wire.config_uninstall(self.install(text)), text)
+
+    def test_installing_twice_is_the_same_as_once(self):
+        for text in CORPUS:
+            once = self.install(text)
+            self.assertEqual(self.install(once), once)
+
+    def test_changing_position_moves_the_entry(self):
+        text = '{"modules-left": [], "modules-center": ["clock"]}'
+        out = wire.config_install(
+            wire.config_install(text, "/w/h.jsonc", "center"),
+            "/w/h.jsonc", "left")
+        parsed = json.loads(_strip(out))
+        self.assertIn(wire.GROUP, parsed["modules-left"])
+        self.assertNotIn(wire.GROUP, parsed["modules-center"])
+
+
+class TestManualInstallDetection(unittest.TestCase):
+    def test_a_hand_wired_config_is_detected(self):
+        self.assertTrue(wire.manual_install_present(
+            '{"modules-center": ["group/herdr-watchr"]}'))
+
+    def test_our_own_output_is_not_detected(self):
+        out = wire.config_install(PRETTY, "/w/h.jsonc", "center")
+        self.assertFalse(wire.manual_install_present(out))
+
+    def test_an_unrelated_config_is_not_detected(self):
+        self.assertFalse(wire.manual_install_present(PRETTY))
 
 
 if __name__ == "__main__":
