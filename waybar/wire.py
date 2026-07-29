@@ -112,6 +112,34 @@ def matching_bracket(text, start):
     raise ScanError("unbalanced %s" % open_c)
 
 
+def module_config(binary):
+    modules = {
+        GROUP: {
+            "orientation": "inherit",
+            "modules": ["custom/herdr-watchr-notify"] +
+                       ["custom/herdr-%s" % s for s in VOCABULARY],
+        },
+        "custom/herdr-watchr-notify": {
+            "exec": "%s notify" % binary,
+            "return-type": "json",
+            "format": "{}",
+            "hide-empty-text": True,
+            "tooltip": False,
+        },
+    }
+    for status in VOCABULARY:
+        modules["custom/herdr-%s" % status] = {
+            "exec": "%s status %s" % (binary, status),
+            "return-type": "json",
+            "format": "{}",
+            "hide-empty-text": True,
+            "tooltip": True,
+            "signal": 8,
+            "on-click": "%s focus-status %s" % (binary, status),
+        }
+    return json.dumps(modules, indent=2) + "\n"
+
+
 def _last_content(text, start, stop):
     i = start
     last = -1

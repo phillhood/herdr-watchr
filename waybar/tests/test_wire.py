@@ -1,7 +1,11 @@
+import json
+import pathlib
 import unittest
 
 import support  # noqa: F401
 import wire
+
+EXAMPLES = pathlib.Path(support.ROOT) / "waybar" / "examples"
 
 
 class TestStringScan(unittest.TestCase):
@@ -74,6 +78,27 @@ class TestLastContent(unittest.TestCase):
 
     def test_an_empty_array_has_no_content(self):
         self.assertEqual(wire._last_content("[  ]", 1, 3), -1)
+
+
+class TestModuleConfig(unittest.TestCase):
+    def test_it_matches_the_shipped_example(self):
+        example = EXAMPLES / "waybar-config.jsonc"
+        self.assertEqual(
+            json.loads(wire.module_config("~/.local/bin/herdr-watchr")),
+            json.loads(example.read_text(encoding="utf-8")))
+
+    def test_the_binary_path_is_baked_into_every_command(self):
+        generated = json.loads(wire.module_config("/opt/bin/herdr-watchr"))
+        self.assertEqual(generated["custom/herdr-blocked"]["exec"],
+                         "/opt/bin/herdr-watchr status blocked")
+        self.assertEqual(generated["custom/herdr-blocked"]["on-click"],
+                         "/opt/bin/herdr-watchr focus-status blocked")
+        self.assertEqual(generated["custom/herdr-watchr-notify"]["exec"],
+                         "/opt/bin/herdr-watchr notify")
+
+    def test_the_vocabulary_matches_the_renderer(self):
+        hw = support.load_script()
+        self.assertEqual(tuple(wire.VOCABULARY), tuple(hw.VOCABULARY))
 
 
 if __name__ == "__main__":
