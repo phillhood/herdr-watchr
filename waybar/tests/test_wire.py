@@ -1,5 +1,7 @@
 import json
 import pathlib
+import shutil
+import tempfile
 import unittest
 
 import support  # noqa: F401
@@ -245,6 +247,128 @@ class TestManualInstallDetection(unittest.TestCase):
 
     def test_an_unrelated_config_is_not_detected(self):
         self.assertFalse(wire.manual_install_present(PRETTY))
+
+
+class WireFilesystemCase(unittest.TestCase):
+    def setUp(self):
+        self.dir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, self.dir)
+        self.cfg = pathlib.Path(self.dir) / "config.jsonc"
+        self.css = pathlib.Path(self.dir) / "style.css"
+        self.cfg.write_text(PRETTY, encoding="utf-8")
+        self.css.write_text("#clock { color: red; }\n", encoding="utf-8")
+
+    def owned(self, name):
+        return pathlib.Path(self.dir) / name
+
+
+class TestInstallOnDisk(WireFilesystemCase):
+    def test_it_writes_both_owned_files(self):
+        wire.install(self.dir, "/opt/bin/herdr-watchr", "center", "1")
+        self.assertTrue(self.owned("herdr-watchr.jsonc").exists())
+        self.assertTrue(self.owned("herdr-watchr.css").exists())
+
+    def test_the_owned_css_matches_the_example(self):
+        wire.install(self.dir, "/opt/bin/herdr-watchr", "center", "1")
+        self.assertEqual(
+            self.owned("herdr-watchr.css").read_text(encoding="utf-8"),
+            (EXAMPLES / "style.css").read_text(encoding="utf-8"))
+
+    def test_it_backs_up_before_changing(self):
+        wire.install(self.dir, "/opt/bin/herdr-watchr", "center", "77")
+        self.assertTrue(self.owned("config.jsonc.herdr-watchr-backup-77").exists())
+
+    def test_a_no_op_rerun_writes_no_second_backup(self):
+        wire.install(self.dir, "/opt/bin/herdr-watchr", "center", "1")
+        wire.install(self.dir, "/opt/bin/herdr-watchr", "center", "2")
+        self.assertFalse(self.owned("config.jsonc.herdr-watchr-backup-2").exists())
+
+    def test_uninstall_restores_the_config_bytes(self):
+        wire.install(self.dir, "/opt/bin/herdr-watchr", "center", "1")
+        wire.uninstall(self.dir, "2")
+        self.assertEqual(self.cfg.read_text(encoding="utf-8"), PRETTY)
+
+    def test_uninstall_restores_the_stylesheet_bytes(self):
+        original = self.css.read_text(encoding="utf-8")
+        wire.install(self.dir, "/opt/bin/herdr-watchr", "center", "1")
+        wire.uninstall(self.dir, "2")
+        self.assertEqual(self.css.read_text(encoding="utf-8"), original)
+
+    def test_uninstall_removes_the_owned_files(self):
+        wire.install(self.dir, "/opt/bin/herdr-watchr", "center", "1")
+        wire.uninstall(self.dir, "2")
+        self.assertFalse(self.owned("herdr-watchr.jsonc").exists())
+        self.assertFalse(self.owned("herdr-watchr.css").exists())
+
+    def test_a_symlinked_config_stays_a_symlink(self):
+        real = pathlib.Path(self.dir) / "real.jsonc"
+        real.write_text(PRETTY, encoding="utf-8")
+        self.cfg.unlink()
+        self.cfg.symlink_to(real)
+        wire.install(self.dir, "/opt/bin/herdr-watchr", "center", "1")
+        self.assertTrue(self.cfg.is_symlink())
+        self.assertIn(wire.GROUP, real.read_text(encoding="utf-8"))
+
+    def test_a_manual_install_is_refused(self):
+        self.cfg.write_text('{"modules-center": ["group/herdr-watchr"]}',
+                            encoding="utf-8")
+        with self.assertRaises(wire.ScanError):
+            wire.install(self.dir, "/opt/bin/herdr-watchr", "center", "1")
+
+    def test_force_overrides_the_manual_check(self):
+        self.cfg.write_text('{"modules-center": ["group/herdr-watchr"]}',
+                            encoding="utf-8")
+        wire.install(self.dir, "/opt/bin/herdr-watchr", "center", "1", True)
+        self.assertIn(wire.GROUP_MARK, self.cfg.read_text(encoding="utf-8"))
+
+    def test_a_missing_config_is_refused(self):
+        self.cfg.unlink()
+        with self.assertRaises(wire.ScanError):
+            wire.install(self.dir, "/opt/bin/herdr-watchr", "center", "1")
+
+    def test_a_missing_stylesheet_is_refused(self):
+        self.css.unlink()
+        with self.assertRaises(wire.ScanError):
+            wire.install(self.dir, "/opt/bin/herdr-watchr", "center", "1")
+
+    def test_a_refusal_leaves_the_config_untouched(self):
+        self.cfg.write_text(INCLUDE_STRING, encoding="utf-8")
+        with self.assertRaises(wire.ScanError):
+            wire.install(self.dir, "/opt/bin/herdr-watchr", "center", "1")
+        self.assertEqual(self.cfg.read_text(encoding="utf-8"), INCLUDE_STRING)
+
+    def test_a_refusal_leaves_the_stylesheet_untouched(self):
+        original = self.css.read_text(encoding="utf-8")
+        self.cfg.write_text(INCLUDE_STRING, encoding="utf-8")
+        with self.assertRaises(wire.ScanError):
+            wire.install(self.dir, "/opt/bin/herdr-watchr", "center", "1")
+        self.assertEqual(self.css.read_text(encoding="utf-8"), original)
+
+    def test_a_config_without_an_extension_is_found(self):
+        self.cfg.unlink()
+        plain = pathlib.Path(self.dir) / "config"
+        plain.write_text(PRETTY, encoding="utf-8")
+        wire.install(self.dir, "/opt/bin/herdr-watchr", "center", "1")
+        self.assertIn(wire.GROUP, plain.read_text(encoding="utf-8"))
+
+
+class TestWireCli(WireFilesystemCase):
+    def test_install_returns_zero(self):
+        code = wire.main(["wire.py", "install", "--waybar-dir", self.dir,
+                          "--binary", "/opt/bin/herdr-watchr", "--stamp", "1"])
+        self.assertEqual(code, 0)
+
+    def test_a_refusal_returns_one(self):
+        self.cfg.unlink()
+        code = wire.main(["wire.py", "install", "--waybar-dir", self.dir,
+                          "--binary", "/opt/bin/herdr-watchr", "--stamp", "1"])
+        self.assertEqual(code, 1)
+
+    def test_an_unknown_action_returns_two(self):
+        self.assertEqual(wire.main(["wire.py", "wat"]), 2)
+
+    def test_an_unknown_option_returns_two(self):
+        self.assertEqual(wire.main(["wire.py", "install", "--wat"]), 2)
 
 
 if __name__ == "__main__":

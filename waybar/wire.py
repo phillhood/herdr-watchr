@@ -112,6 +112,9 @@ def matching_bracket(text, start):
     raise ScanError("unbalanced %s" % open_c)
 
 
+HERE = os.path.dirname(os.path.abspath(__file__))
+EXAMPLE_CSS = os.path.join(HERE, "examples", "style.css")
+
 INCLUDE_BLOCK_RE = re.compile(
     "\n  " + re.escape(MARK_OPEN) + "\n  \"include\": \\[\"[^\"]*\"\\],\n  " +
     re.escape(MARK_CLOSE) + "\n")
@@ -226,3 +229,126 @@ def _last_content(text, start, stop):
             last = i
         i += 1
     return last
+
+
+def config_file(waybar_dir):
+    for name in ("config.jsonc", "config"):
+        path = os.path.join(waybar_dir, name)
+        if os.path.exists(path):
+            return path
+    raise ScanError("no waybar config found in %s" % waybar_dir)
+
+
+def _read(path):
+    with open(path, "r", encoding="utf-8") as fh:
+        return fh.read()
+
+
+def _write_in_place(path, text):
+    with open(os.path.realpath(path), "w", encoding="utf-8") as fh:
+        fh.write(text)
+
+
+def _backup(path, stamp):
+    real = os.path.realpath(path)
+    shutil.copyfile(real, "%s.herdr-watchr-backup-%s" % (real, stamp))
+
+
+def install(waybar_dir, binary, position, stamp, force=False):
+    cfg_path = config_file(waybar_dir)
+    css_path = os.path.join(waybar_dir, "style.css")
+    if not os.path.exists(css_path):
+        raise ScanError("no style.css found in %s" % waybar_dir)
+
+    cfg_text = _read(cfg_path)
+    css_text = _read(css_path)
+    if not force and manual_install_present(cfg_text):
+        raise ScanError("config already wires herdr-watchr by hand; "
+                        "remove that wiring or pass --force")
+
+    owned_jsonc = os.path.join(waybar_dir, "herdr-watchr.jsonc")
+    owned_css = os.path.join(waybar_dir, "herdr-watchr.css")
+    new_cfg = config_install(cfg_text, owned_jsonc, position)
+    new_css = css_install(css_text, owned_css)
+
+    with open(owned_jsonc, "w", encoding="utf-8") as fh:
+        fh.write(module_config(binary))
+    shutil.copyfile(EXAMPLE_CSS, owned_css)
+
+    changed = []
+    for path, old, new in ((cfg_path, cfg_text, new_cfg),
+                           (css_path, css_text, new_css)):
+        if old != new:
+            _backup(path, stamp)
+            _write_in_place(path, new)
+            changed.append(path)
+    return changed
+
+
+def uninstall(waybar_dir, stamp):
+    changed = []
+    targets = []
+    try:
+        targets.append((config_file(waybar_dir), config_uninstall))
+    except ScanError:
+        pass
+    css_path = os.path.join(waybar_dir, "style.css")
+    if os.path.exists(css_path):
+        targets.append((css_path, css_uninstall))
+    for path, reverse in targets:
+        text = _read(path)
+        new = reverse(text)
+        if new != text:
+            _backup(path, stamp)
+            _write_in_place(path, new)
+            changed.append(path)
+    for name in ("herdr-watchr.jsonc", "herdr-watchr.css"):
+        owned = os.path.join(waybar_dir, name)
+        if os.path.exists(owned):
+            os.remove(owned)
+    return changed
+
+
+def main(argv):
+    args = argv[1:]
+    if not args:
+        sys.stderr.write("usage: wire.py install|uninstall --waybar-dir DIR\n")
+        return 2
+    action = args[0]
+    opts = {"--waybar-dir": None, "--binary": None,
+            "--position": "center", "--stamp": "0"}
+    force = False
+    i = 1
+    while i < len(args):
+        if args[i] == "--force":
+            force = True
+            i += 1
+        elif args[i] in opts and i + 1 < len(args):
+            opts[args[i]] = args[i + 1]
+            i += 2
+        else:
+            sys.stderr.write("wire.py: unknown option %s\n" % args[i])
+            return 2
+    try:
+        if action == "install":
+            changed = install(opts["--waybar-dir"], opts["--binary"],
+                              opts["--position"], opts["--stamp"], force)
+        elif action == "uninstall":
+            changed = uninstall(opts["--waybar-dir"], opts["--stamp"])
+        else:
+            sys.stderr.write("wire.py: unknown action %s\n" % action)
+            return 2
+    except ScanError as exc:
+        sys.stderr.write("herdr-watchr: %s\n" % exc)
+        return 1
+    for path in changed:
+        real = os.path.realpath(path)
+        if real == path:
+            sys.stdout.write("edited %s\n" % real)
+        else:
+            sys.stdout.write("edited %s (via symlink)\n" % real)
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv))
