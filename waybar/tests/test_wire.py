@@ -101,5 +101,30 @@ class TestModuleConfig(unittest.TestCase):
         self.assertEqual(tuple(wire.VOCABULARY), tuple(hw.VOCABULARY))
 
 
+class TestCssSplice(unittest.TestCase):
+    ORIGINAL = "#clock {\n  color: red;\n}\n"
+
+    def test_the_import_lands_at_byte_zero(self):
+        out = wire.css_install(self.ORIGINAL, "/w/herdr-watchr.css")
+        self.assertTrue(out.startswith(wire.CSS_OPEN))
+        self.assertIn('@import url("/w/herdr-watchr.css");', out)
+
+    def test_the_original_rules_survive(self):
+        out = wire.css_install(self.ORIGINAL, "/w/herdr-watchr.css")
+        self.assertIn(self.ORIGINAL, out)
+
+    def test_uninstall_restores_the_original_bytes(self):
+        out = wire.css_install(self.ORIGINAL, "/w/herdr-watchr.css")
+        self.assertEqual(wire.css_uninstall(out), self.ORIGINAL)
+
+    def test_installing_twice_is_the_same_as_once(self):
+        once = wire.css_install(self.ORIGINAL, "/w/herdr-watchr.css")
+        twice = wire.css_install(once, "/w/herdr-watchr.css")
+        self.assertEqual(once, twice)
+
+    def test_uninstall_on_an_untouched_file_changes_nothing(self):
+        self.assertEqual(wire.css_uninstall(self.ORIGINAL), self.ORIGINAL)
+
+
 if __name__ == "__main__":
     unittest.main()

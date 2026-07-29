@@ -112,6 +112,24 @@ def matching_bracket(text, start):
     raise ScanError("unbalanced %s" % open_c)
 
 
+def css_install(text, css_path):
+    line = '%s @import url("%s"); %s\n' % (CSS_OPEN, css_path, CSS_CLOSE)
+    return line + css_uninstall(text)
+
+
+def css_uninstall(text):
+    start = text.find(CSS_OPEN)
+    if start < 0:
+        return text
+    end = text.find(CSS_CLOSE, start)
+    if end < 0:
+        return text
+    end += len(CSS_CLOSE)
+    if text[end:end + 1] == "\n":
+        end += 1
+    return text[:start] + text[end:]
+
+
 def module_config(binary):
     modules = {
         GROUP: {
