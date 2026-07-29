@@ -1,6 +1,6 @@
 # herdr-watchr
 
-Live [herdr](https://github.com/phillhood/herdr) agent status in waybar, and
+Live [herdr](https://github.com/ogulcancelik/herdr) agent status in waybar, and
 click to jump to an agent.
 
 One module per status — blocked, idle, done, working, unknown — each a coloured
