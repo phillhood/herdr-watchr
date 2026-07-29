@@ -27,6 +27,13 @@ cd herdr-watchr
 That symlinks `herdr-watchr` into `~/.local/bin`. Pass `--copy` to copy instead,
 or set `HERDR_WATCHR_PREFIX` to install somewhere else.
 
+**Use the absolute path in waybar, not the bare command.** waybar runs modules
+with the environment it was launched from, which for a compositor autostart or a
+display manager routinely excludes `~/.local/bin` — even when your interactive
+shell has it. A bare `herdr-watchr` then resolves to nothing and the modules
+simply never appear, with no error in the bar. The installer prints the exact
+line to use; the examples below assume the default `~/.local/bin`.
+
 Then wire up waybar, in three edits to `~/.config/waybar/`:
 
 **1. Add the group and its six modules** to `config.jsonc`. Copy them from
@@ -47,13 +54,13 @@ one hidden watcher plus five status modules, all following the same shape:
 },
 
 "custom/herdr-blocked": {
-  "exec": "herdr-watchr status blocked",
+  "exec": "~/.local/bin/herdr-watchr status blocked",
   "return-type": "json",
   "format": "{}",
   "hide-empty-text": true,
   "tooltip": true,
   "signal": 8,
-  "on-click": "herdr-watchr focus-status blocked"
+  "on-click": "~/.local/bin/herdr-watchr focus-status blocked"
 }
 ```
 

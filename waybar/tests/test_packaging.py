@@ -52,6 +52,12 @@ class TestInstallScript(unittest.TestCase):
         _target, proc = self.install()
         self.assertIn("not on PATH", proc.stderr)
 
+    def test_it_prints_an_absolute_exec_line_for_waybar(self):
+        target, proc = self.install()
+        self.assertIn("waybar does not inherit your shell PATH", proc.stdout)
+        self.assertIn('"exec": "%s/herdr-watchr status blocked"' % target,
+                      proc.stdout)
+
     def test_the_printed_snippet_paths_exist(self):
         _target, proc = self.install()
         checked = []
@@ -71,11 +77,13 @@ class TestExampleWaybarConfig(unittest.TestCase):
             self.assertIn('"custom/herdr-%s"' % status, text)
         self.assertIn('"custom/herdr-watchr-notify"', text)
 
-    def test_every_module_invokes_the_path_binary(self):
+    def test_every_module_invokes_an_absolute_path(self):
         text = (EXAMPLES / "waybar-config.jsonc").read_text(encoding="utf-8")
         self.assertNotIn("~/.config/waybar/herdr", text)
-        self.assertEqual(text.count('"exec": "herdr-watchr status'), 5)
-        self.assertEqual(text.count('"on-click": "herdr-watchr focus-status'), 5)
+        self.assertEqual(text.count('": "herdr-watchr'), 0)
+        self.assertEqual(text.count('"exec": "~/.local/bin/herdr-watchr status'), 5)
+        self.assertEqual(
+            text.count('"on-click": "~/.local/bin/herdr-watchr focus-status'), 5)
 
 
 class TestExampleStylesheet(unittest.TestCase):

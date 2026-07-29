@@ -12,7 +12,7 @@
   },
 
   "custom/herdr-watchr-notify": {
-    "exec": "herdr-watchr notify",
+    "exec": "~/.local/bin/herdr-watchr notify",
     "return-type": "json",
     "format": "{}",
     "hide-empty-text": true,
@@ -20,52 +20,52 @@
   },
 
   "custom/herdr-blocked": {
-    "exec": "herdr-watchr status blocked",
+    "exec": "~/.local/bin/herdr-watchr status blocked",
     "return-type": "json",
     "format": "{}",
     "hide-empty-text": true,
     "tooltip": true,
     "signal": 8,
-    "on-click": "herdr-watchr focus-status blocked"
+    "on-click": "~/.local/bin/herdr-watchr focus-status blocked"
   },
 
   "custom/herdr-idle": {
-    "exec": "herdr-watchr status idle",
+    "exec": "~/.local/bin/herdr-watchr status idle",
     "return-type": "json",
     "format": "{}",
     "hide-empty-text": true,
     "tooltip": true,
     "signal": 8,
-    "on-click": "herdr-watchr focus-status idle"
+    "on-click": "~/.local/bin/herdr-watchr focus-status idle"
   },
 
   "custom/herdr-done": {
-    "exec": "herdr-watchr status done",
+    "exec": "~/.local/bin/herdr-watchr status done",
     "return-type": "json",
     "format": "{}",
     "hide-empty-text": true,
     "tooltip": true,
     "signal": 8,
-    "on-click": "herdr-watchr focus-status done"
+    "on-click": "~/.local/bin/herdr-watchr focus-status done"
   },
 
   "custom/herdr-working": {
-    "exec": "herdr-watchr status working",
+    "exec": "~/.local/bin/herdr-watchr status working",
     "return-type": "json",
     "format": "{}",
     "hide-empty-text": true,
     "tooltip": true,
     "signal": 8,
-    "on-click": "herdr-watchr focus-status working"
+    "on-click": "~/.local/bin/herdr-watchr focus-status working"
   },
 
   "custom/herdr-unknown": {
-    "exec": "herdr-watchr status unknown",
+    "exec": "~/.local/bin/herdr-watchr status unknown",
     "return-type": "json",
     "format": "{}",
     "hide-empty-text": true,
     "tooltip": true,
     "signal": 8,
-    "on-click": "herdr-watchr focus-status unknown"
+    "on-click": "~/.local/bin/herdr-watchr focus-status unknown"
   }
 }

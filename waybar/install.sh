@@ -28,6 +28,10 @@ case ":${PATH-}:" in
   *) printf '%s is not on PATH; add it to your shell profile\n' "$dest_dir" >&2 ;;
 esac
 
+printf '\nwaybar does not inherit your shell PATH. Use the absolute path in every\n'
+printf 'exec and on-click, for example:\n\n'
+printf '  "exec": "%s status blocked"\n\n' "$dest"
+
 printf 'waybar modules: %s\n' "$here/examples/waybar-config.jsonc"
 printf 'waybar css:     %s\n' "$here/examples/style.css"
 printf 'config example: %s\n' "$here/examples/config.json"
