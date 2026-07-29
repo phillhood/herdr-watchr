@@ -1,5 +1,6 @@
 import json
 import pathlib
+import re
 import shutil
 import tempfile
 import unittest
@@ -24,7 +25,7 @@ def _strip(text):
             continue
         out.append(text[i])
         i += 1
-    return "".join(out)
+    return re.sub(r",(\s*[\]}])", r"\1", "".join(out))
 
 
 PRETTY = '''{
@@ -50,7 +51,23 @@ INCLUDE_ARRAY = '{"include": ["/a.jsonc"], "modules-center": ["clock"]}'
 
 INCLUDE_STRING = '{"include": "/a.jsonc", "modules-center": ["clock"]}'
 
-CORPUS = (PRETTY, SINGLE_LINE, EMPTY_LIST, WITH_COMMENT, INCLUDE_ARRAY)
+TRAILING_COMMA = '{"modules-center": ["clock",], "clock": {}}'
+
+TRAILING_COMMA_INCLUDE = '{"include": ["/a.jsonc",], "modules-center": ["clock"]}'
+
+CRLF = '{\r\n  "modules-center": ["clock"],\r\n  "clock": {}\r\n}\r\n'
+
+TABS = '{\n\t"modules-center": [\n\t\t"clock"\n\t],\n\t"clock": {}\n}\n'
+
+UNICODE = '{"modules-center": ["clock"], "clock": {"format": "☺ é"}}'
+
+DUPLICATE_MODULES = '{"modules-center": ["a"], "modules-center": ["b"]}'
+
+DUPLICATE_INCLUDE = ('{"include": ["/a.jsonc"], "include": ["/b.jsonc"], '
+                     '"modules-center": ["clock"]}')
+
+CORPUS = (PRETTY, SINGLE_LINE, EMPTY_LIST, WITH_COMMENT, INCLUDE_ARRAY,
+          TRAILING_COMMA, TRAILING_COMMA_INCLUDE, CRLF, TABS, UNICODE)
 
 
 class TestStringScan(unittest.TestCase):
@@ -236,6 +253,42 @@ class TestConfigSplice(unittest.TestCase):
         self.assertNotIn(wire.GROUP, parsed["modules-center"])
 
 
+class TestAdversarialShapes(unittest.TestCase):
+    def install(self, text, position="center"):
+        return wire.config_install(text, "/w/herdr-watchr.jsonc", position)
+
+    def test_a_trailing_comma_does_not_become_a_double_comma(self):
+        out = self.install(TRAILING_COMMA)
+        self.assertNotIn(",,", out)
+        self.assertIn(wire.GROUP, json.loads(_strip(out))["modules-center"])
+
+    def test_a_trailing_comma_in_include_stays_valid(self):
+        out = self.install(TRAILING_COMMA_INCLUDE)
+        self.assertNotIn(",,", out)
+        self.assertIn("/w/herdr-watchr.jsonc",
+                      json.loads(_strip(out))["include"])
+
+    def test_crlf_line_endings_survive_the_splice(self):
+        out = self.install(CRLF)
+        self.assertNotIn("\n", out.replace("\r\n", ""))
+
+    def test_duplicate_modules_keys_are_refused(self):
+        with self.assertRaises(wire.ScanError):
+            self.install(DUPLICATE_MODULES)
+
+    def test_duplicate_include_keys_are_refused(self):
+        with self.assertRaises(wire.ScanError):
+            self.install(DUPLICATE_INCLUDE)
+
+    def test_value_offsets_finds_every_depth_one_match(self):
+        self.assertEqual(len(wire.value_offsets(DUPLICATE_MODULES,
+                                                "modules-center")), 2)
+
+    def test_a_nested_duplicate_does_not_count(self):
+        text = '{"g": {"modules-center": [1]}, "modules-center": ["a"]}'
+        self.assertEqual(len(wire.value_offsets(text, "modules-center")), 1)
+
+
 class TestManualInstallDetection(unittest.TestCase):
     def test_a_hand_wired_config_is_detected(self):
         self.assertTrue(wire.manual_install_present(
@@ -319,7 +372,7 @@ class TestInstallOnDisk(WireFilesystemCase):
         self.cfg.write_text('{"modules-center": ["group/herdr-watchr"]}',
                             encoding="utf-8")
         wire.install(self.dir, "/opt/bin/herdr-watchr", "center", "1", True)
-        self.assertIn(wire.GROUP_MARK, self.cfg.read_text(encoding="utf-8"))
+        self.assertIn(wire.GRP_OPEN, self.cfg.read_text(encoding="utf-8"))
 
     def test_a_missing_config_is_refused(self):
         self.cfg.unlink()
@@ -350,6 +403,42 @@ class TestInstallOnDisk(WireFilesystemCase):
         plain.write_text(PRETTY, encoding="utf-8")
         wire.install(self.dir, "/opt/bin/herdr-watchr", "center", "1")
         self.assertIn(wire.GROUP, plain.read_text(encoding="utf-8"))
+
+
+class TestRawByteRoundTrip(unittest.TestCase):
+    def round_trip(self, config_bytes, css_bytes):
+        directory = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, directory)
+        cfg = pathlib.Path(directory) / "config.jsonc"
+        css = pathlib.Path(directory) / "style.css"
+        cfg.write_bytes(config_bytes)
+        css.write_bytes(css_bytes)
+        wire.install(directory, "/opt/bin/herdr-watchr", "center", "1")
+        spliced = cfg.read_bytes()
+        wire.uninstall(directory, "2")
+        return spliced, cfg.read_bytes(), css.read_bytes()
+
+    def test_crlf_config_and_css_restore_byte_for_byte(self):
+        config_bytes = CRLF.encode("utf-8")
+        css_bytes = b"#clock { color: red; }\r\n"
+        _spliced, cfg_after, css_after = self.round_trip(config_bytes, css_bytes)
+        self.assertEqual(cfg_after, config_bytes)
+        self.assertEqual(css_after, css_bytes)
+
+    def test_a_spliced_crlf_config_gains_no_bare_newline(self):
+        config_bytes = CRLF.encode("utf-8")
+        spliced, _cfg, _css = self.round_trip(config_bytes, b"#a{}\r\n")
+        self.assertNotIn(b"\n", spliced.replace(b"\r\n", b""))
+
+    def test_unicode_survives_byte_for_byte(self):
+        config_bytes = UNICODE.encode("utf-8")
+        _spliced, cfg_after, _css = self.round_trip(config_bytes, b"#a{}\n")
+        self.assertEqual(cfg_after, config_bytes)
+
+    def test_a_file_without_a_trailing_newline_restores(self):
+        config_bytes = SINGLE_LINE.encode("utf-8")
+        _spliced, cfg_after, _css = self.round_trip(config_bytes, b"#a{}")
+        self.assertEqual(cfg_after, config_bytes)
 
 
 class TestWireCli(WireFilesystemCase):

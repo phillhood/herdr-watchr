@@ -8,10 +8,12 @@ import sys
 VOCABULARY = ("blocked", "idle", "done", "working", "unknown")
 POSITIONS = ("left", "center", "right")
 
-MARK_OPEN = "// >>> herdr-watchr >>>"
-MARK_CLOSE = "// <<< herdr-watchr <<<"
-INCLUDE_MARK = "/* herdr-watchr include */"
-GROUP_MARK = "/* herdr-watchr group */"
+MARK_OPEN = "/* >>> herdr-watchr >>> */"
+MARK_CLOSE = "/* <<< herdr-watchr <<< */"
+INC_OPEN = "/* >>> herdr-watchr include >>> */"
+INC_CLOSE = "/* <<< herdr-watchr include <<< */"
+GRP_OPEN = "/* >>> herdr-watchr group >>> */"
+GRP_CLOSE = "/* <<< herdr-watchr group <<< */"
 CSS_OPEN = "/* >>> herdr-watchr >>> */"
 CSS_CLOSE = "/* <<< herdr-watchr <<< */"
 GROUP = "group/herdr-watchr"
@@ -65,7 +67,8 @@ def top_level_open(text):
     return i
 
 
-def value_offset(text, key):
+def value_offsets(text, key):
+    found = []
     depth = 0
     i = 0
     while i < len(text):
@@ -78,7 +81,7 @@ def value_offset(text, key):
             if depth == 1 and text[i + 1:j - 1] == key:
                 k = _skip_blanks(text, j)
                 if k < len(text) and text[k] == ":":
-                    return _skip_blanks(text, k + 1)
+                    found.append(_skip_blanks(text, k + 1))
             i = j
             continue
         if c in "{[":
@@ -86,7 +89,16 @@ def value_offset(text, key):
         elif c in "}]":
             depth -= 1
         i += 1
-    return None
+    return found
+
+
+def value_offset(text, key):
+    found = value_offsets(text, key)
+    return found[0] if found else None
+
+
+def _newline(text):
+    return "\r\n" if "\r\n" in text else "\n"
 
 
 def matching_bracket(text, start):
@@ -115,23 +127,32 @@ def matching_bracket(text, start):
 HERE = os.path.dirname(os.path.abspath(__file__))
 EXAMPLE_CSS = os.path.join(HERE, "examples", "style.css")
 
-INCLUDE_BLOCK_RE = re.compile(
-    "\n  " + re.escape(MARK_OPEN) + "\n  \"include\": \\[\"[^\"]*\"\\],\n  " +
-    re.escape(MARK_CLOSE) + "\n")
-INCLUDE_ELEM_RE = re.compile("\"[^\"]*\" " + re.escape(INCLUDE_MARK) + ", ?")
-GROUP_ENTRY_RE = re.compile(
-    ",? ?\"" + re.escape(GROUP) + "\" " + re.escape(GROUP_MARK))
+def _cut_span(text, open_mark, close_mark, eat_newline=False):
+    start = text.find(open_mark)
+    if start < 0:
+        return text
+    end = text.find(close_mark, start)
+    if end < 0:
+        return text
+    end += len(close_mark)
+    if eat_newline:
+        if text[end:end + 2] == "\r\n":
+            end += 2
+        elif text[end:end + 1] == "\n":
+            end += 1
+    return text[:start] + text[end:]
 
 
 def config_uninstall(text):
-    text = INCLUDE_BLOCK_RE.sub("", text, count=1)
-    text = INCLUDE_ELEM_RE.sub("", text, count=1)
-    return GROUP_ENTRY_RE.sub("", text, count=1)
+    text = _cut_span(text, MARK_OPEN, MARK_CLOSE)
+    text = _cut_span(text, INC_OPEN, INC_CLOSE)
+    return _cut_span(text, GRP_OPEN, GRP_CLOSE)
 
 
 def manual_install_present(text):
-    if MARK_OPEN in text or INCLUDE_MARK in text or GROUP_MARK in text:
-        return False
+    for mark in (MARK_OPEN, INC_OPEN, GRP_OPEN):
+        if mark in text:
+            return False
     return "herdr-watchr" in text
 
 
@@ -140,34 +161,43 @@ def config_install(text, include_path, position):
         raise ScanError("position must be one of %s" % ", ".join(POSITIONS))
     text = config_uninstall(text)
     open_at = top_level_open(text)
+    nl = _newline(text)
+    key = "modules-%s" % position
+    for duplicated in ("include", key):
+        if len(value_offsets(text, duplicated)) > 1:
+            raise ScanError("%s appears more than once at the top level; "
+                            "remove the duplicate before installing" % duplicated)
     include_at = value_offset(text, "include")
     if include_at is None:
-        block = "\n  %s\n  \"include\": [\"%s\"],\n  %s\n" % (
-            MARK_OPEN, include_path, MARK_CLOSE)
+        block = "%s%s  \"include\": [\"%s\"],%s  %s" % (
+            MARK_OPEN, nl, include_path, nl, MARK_CLOSE)
         text = text[:open_at + 1] + block + text[open_at + 1:]
     elif text[include_at] == "[":
         close = matching_bracket(text, include_at)
-        element = "\"%s\" %s" % (include_path, INCLUDE_MARK)
+        element = "%s\"%s\"" % (INC_OPEN, include_path)
         if _last_content(text, include_at + 1, close) >= 0:
-            element += ", "
+            element += ","
+        element += INC_CLOSE
         text = text[:include_at + 1] + element + text[include_at + 1:]
     else:
         raise ScanError("include is not an array; add the include entry by hand")
 
-    key = "modules-%s" % position
     array_at = value_offset(text, key)
     if array_at is None or text[array_at] != "[":
         raise ScanError("%s is not an array in this config" % key)
     close = matching_bracket(text, array_at)
     last = _last_content(text, array_at + 1, close)
-    entry = "\"%s\" %s" % (GROUP, GROUP_MARK)
     if last < 0:
-        return text[:array_at + 1] + entry + text[array_at + 1:]
-    return text[:last + 1] + ", " + entry + text[last + 1:]
+        span = "%s\"%s\"%s" % (GRP_OPEN, GROUP, GRP_CLOSE)
+        return text[:array_at + 1] + span + text[array_at + 1:]
+    separator = " " if text[last] == "," else ", "
+    span = "%s%s\"%s\"%s" % (GRP_OPEN, separator, GROUP, GRP_CLOSE)
+    return text[:last + 1] + span + text[last + 1:]
 
 
 def css_install(text, css_path):
-    line = '%s @import url("%s"); %s\n' % (CSS_OPEN, css_path, CSS_CLOSE)
+    line = '%s @import url("%s"); %s%s' % (
+        CSS_OPEN, css_path, CSS_CLOSE, _newline(text))
     return line + css_uninstall(text)
 
 
@@ -179,7 +209,9 @@ def css_uninstall(text):
     if end < 0:
         return text
     end += len(CSS_CLOSE)
-    if text[end:end + 1] == "\n":
+    if text[end:end + 2] == "\r\n":
+        end += 2
+    elif text[end:end + 1] == "\n":
         end += 1
     return text[:start] + text[end:]
 
@@ -240,12 +272,12 @@ def config_file(waybar_dir):
 
 
 def _read(path):
-    with open(path, "r", encoding="utf-8") as fh:
+    with open(path, "r", encoding="utf-8", newline="") as fh:
         return fh.read()
 
 
 def _write_in_place(path, text):
-    with open(os.path.realpath(path), "w", encoding="utf-8") as fh:
+    with open(os.path.realpath(path), "w", encoding="utf-8", newline="") as fh:
         fh.write(text)
 
 

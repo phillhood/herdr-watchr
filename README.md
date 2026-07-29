@@ -43,10 +43,13 @@ you with no bar at all. The installer signals waybar and tells you to restart.
 
 Set `HERDR_WATCHR_PREFIX` to install the binary somewhere other than `~/.local/bin`.
 
-The installer refuses, changing nothing, whenever it cannot be certain: no waybar
-config, a multi-bar config, a missing `modules-*` list, an `include` that is a
-string rather than an array, or a file it cannot parse. In each case it says what
-to add by hand — see [`waybar/examples/`](waybar/examples/) for the full snippets.
+The installer refuses whenever it cannot be certain: no waybar config, a multi-bar
+config, a missing `modules-*` list, a duplicated `include` or `modules-*` key, an
+`include` that is a string rather than an array, or a file it cannot parse. On any
+refusal your `config.jsonc` and `style.css` are left byte-identical, and it prints
+what to add by hand — see [`waybar/examples/`](waybar/examples/) for the snippets.
+The binary is installed before wiring is attempted, so it stays in place after a
+refusal and the manual instructions remain usable.
 
 If your `config.jsonc` is a symlink into a dotfiles repo, the installer follows it,
 edits the real file in place, and prints the path it actually changed. The symlink
