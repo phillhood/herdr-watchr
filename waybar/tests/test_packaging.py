@@ -11,14 +11,38 @@ hw = support.load_script()
 EXAMPLES = support.ROOT / "waybar" / "examples"
 
 
+STOCK_CONFIG = '{"modules-center": ["clock"], "clock": {}}'
+STOCK_CSS = "#clock { color: red; }\n"
+
+
 class TestInstallScript(unittest.TestCase):
+    def setUp(self):
+        self.config_home = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, self.config_home)
+        self.waybar_dir = os.path.join(self.config_home, "waybar")
+        os.makedirs(self.waybar_dir)
+        self.write("config.jsonc", STOCK_CONFIG)
+        self.write("style.css", STOCK_CSS)
+
+    def write(self, name, text):
+        with open(os.path.join(self.waybar_dir, name), "w") as fh:
+            fh.write(text)
+
+    def read(self, name):
+        with open(os.path.join(self.waybar_dir, name)) as fh:
+            return fh.read()
+
+    def run_installer(self, target, *args):
+        env = dict(os.environ, HERDR_WATCHR_PREFIX=target,
+                   XDG_CONFIG_HOME=self.config_home)
+        return subprocess.run(
+            [str(support.ROOT / "waybar" / "install.sh")] + list(args),
+            capture_output=True, text=True, env=env, timeout=30)
+
     def install(self, *args):
         target = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, target)
-        env = dict(os.environ, HERDR_WATCHR_PREFIX=target)
-        proc = subprocess.run([str(support.ROOT / "waybar" / "install.sh")] + list(args),
-                              capture_output=True, text=True, env=env, timeout=30)
-        return target, proc
+        return target, self.run_installer(target, *args)
 
     def test_the_default_install_is_a_symlink_to_the_repo_script(self):
         target, proc = self.install()
@@ -37,11 +61,8 @@ class TestInstallScript(unittest.TestCase):
     def test_reinstalling_over_an_existing_link_succeeds(self):
         target = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, target)
-        env = dict(os.environ, HERDR_WATCHR_PREFIX=target)
-        script = str(support.ROOT / "waybar" / "install.sh")
-        subprocess.run([script], capture_output=True, env=env, timeout=30)
-        proc = subprocess.run([script], capture_output=True, text=True, env=env,
-                              timeout=30)
+        self.run_installer(target)
+        proc = self.run_installer(target)
         self.assertEqual(proc.returncode, 0, proc.stderr)
 
     def test_an_unknown_option_exits_two(self):
@@ -52,21 +73,64 @@ class TestInstallScript(unittest.TestCase):
         _target, proc = self.install()
         self.assertIn("not on PATH", proc.stderr)
 
-    def test_it_prints_an_absolute_exec_line_for_waybar(self):
-        target, proc = self.install()
-        self.assertIn("waybar does not inherit your shell PATH", proc.stdout)
-        self.assertIn('"exec": "%s/herdr-watchr status blocked"' % target,
-                      proc.stdout)
-
-    def test_the_printed_snippet_paths_exist(self):
+    def test_it_wires_the_waybar_config(self):
         _target, proc = self.install()
-        checked = []
-        for line in proc.stdout.splitlines():
-            for word in line.split():
-                if word.startswith("/") and word.endswith((".jsonc", ".css", ".json")):
-                    self.assertTrue(os.path.exists(word), word)
-                    checked.append(word)
-        self.assertEqual(len(checked), 3)
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        text = self.read("config.jsonc")
+        self.assertIn("group/herdr-watchr", text)
+        self.assertIn("herdr-watchr.jsonc", text)
+
+    def test_it_imports_the_stylesheet(self):
+        _target, proc = self.install()
+        self.assertIn("herdr-watchr.css", self.read("style.css"))
+
+    def test_it_writes_the_owned_files(self):
+        self.install()
+        self.assertTrue(os.path.exists(
+            os.path.join(self.waybar_dir, "herdr-watchr.jsonc")))
+        self.assertTrue(os.path.exists(
+            os.path.join(self.waybar_dir, "herdr-watchr.css")))
+
+    def test_the_owned_modules_use_the_installed_binary(self):
+        target, _proc = self.install()
+        modules = json.loads(self.read("herdr-watchr.jsonc"))
+        self.assertEqual(modules["custom/herdr-blocked"]["exec"],
+                         "%s/herdr-watchr status blocked" % target)
+
+    def test_uninstall_restores_both_files(self):
+        target, _proc = self.install()
+        proc = self.run_installer(target, "--uninstall")
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        self.assertEqual(self.read("config.jsonc"), STOCK_CONFIG)
+        self.assertEqual(self.read("style.css"), STOCK_CSS)
+
+    def test_uninstall_removes_the_installed_binary(self):
+        target, _proc = self.install()
+        self.run_installer(target, "--uninstall")
+        self.assertFalse(os.path.exists(os.path.join(target, "herdr-watchr")))
+
+    def test_uninstall_leaves_a_foreign_binary_alone(self):
+        target, _proc = self.install()
+        os.remove(os.path.join(target, "herdr-watchr"))
+        with open(os.path.join(target, "herdr-watchr"), "w") as fh:
+            fh.write("#!/bin/sh\necho not ours\n")
+        self.run_installer(target, "--uninstall")
+        self.assertTrue(os.path.exists(os.path.join(target, "herdr-watchr")))
+
+    def test_an_unknown_position_exits_two(self):
+        _target, proc = self.install("--position", "sideways")
+        self.assertEqual(proc.returncode, 2)
+
+    def test_a_manual_installation_is_refused(self):
+        self.write("config.jsonc",
+                   '{"modules-center": ["group/herdr-watchr"], "clock": {}}')
+        _target, proc = self.install()
+        self.assertEqual(proc.returncode, 1)
+
+    def test_a_missing_waybar_config_is_refused(self):
+        os.remove(os.path.join(self.waybar_dir, "config.jsonc"))
+        _target, proc = self.install()
+        self.assertEqual(proc.returncode, 1)
 
 
 class TestExampleWaybarConfig(unittest.TestCase):
