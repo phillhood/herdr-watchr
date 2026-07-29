@@ -172,8 +172,12 @@ def apply_env(resolved, env):
 def load_config(env=None, host=HOST):
     env = os.environ if env is None else env
     file_data = read_config_file(config_path(env))
-    sane_sections = dict((key, value) for key, value in file_data.items()
-                         if key not in HOST_SECTIONS or isinstance(value, dict))
+    sane_sections = {}
+    for key, value in file_data.items():
+        if key in HOST_SECTIONS and not isinstance(value, dict):
+            warn("config section %s must be an object; ignoring it" % key)
+            continue
+        sane_sections[key] = value
     merged = deep_merge(DEFAULTS, sane_sections)
     trunk = dict((k, v) for k, v in merged.items() if k not in HOST_SECTIONS)
     resolved = deep_merge(trunk, merged.get(host) or {})

@@ -105,8 +105,11 @@ Deep-merged per key, so `{"colors": {"blocked": "#ff0000"}}` overrides one statu
 and leaves the other four at their defaults. A host section may override any
 shared key, which is how a different palette per platform works.
 
-Neither host treats a validation failure as fatal. A malformed config warns once
-and falls back to defaults.
+No config problem is ever fatal. A file that cannot be read or parsed, a
+non-object top level, and a host section that is not an object each warn once on
+stderr and fall back to defaults; the offending section is dropped, not the whole
+file. Warnings are deduplicated by message, so a long-lived poller emits each at
+most once per process.
 
 Both hosts read the same file: `$XDG_CONFIG_HOME/herdr-watchr/config.json`,
 falling back to `~/.config/herdr-watchr/config.json` when `XDG_CONFIG_HOME` is

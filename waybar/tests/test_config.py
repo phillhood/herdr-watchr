@@ -154,6 +154,10 @@ class TestMalformedInput(ConfigCase):
         self.assertEqual(cfg["signal"], 8)
         self.assertEqual(cfg["click_action"], "first")
 
+    def test_a_non_dict_host_section_warns(self):
+        hw.load_config(env=self.with_config({"waybar": "oops"}))
+        self.assertEqual(len(hw._WARNED), 1)
+
     def test_a_resolved_config_does_not_alias_module_defaults(self):
         cfg = hw.load_config(env=MISSING)
         self.assertIsNot(cfg["colors"], hw.DEFAULTS["colors"])
