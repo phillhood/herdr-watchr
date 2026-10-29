@@ -29,6 +29,7 @@ DEFAULTS = {
     },
     "poll_seconds": 1.5,
     "herdr_bin": None,
+    "sessions": None,
     "waybar": {
         "icons": {
             "blocked": "\U000F009A",
@@ -240,14 +241,58 @@ def emit(payload):
     sys.stdout.flush()
 
 
-def fetch_agents(cfg):
+def herdr_argv(cfg, session, *args):
+    argv = [herdr_bin(cfg)]
+    if session is not None:
+        argv += ["--session", session]
+    return argv + list(args)
+
+
+def run_json(argv):
+    proc = subprocess.run(argv, capture_output=True, text=True, timeout=3)
+    return json.loads(proc.stdout)
+
+
+def list_sessions(cfg):
     try:
-        proc = subprocess.run([herdr_bin(cfg), "agent", "list"],
-                              capture_output=True, text=True, timeout=3)
-        agents = json.loads(proc.stdout).get("result", {}).get("agents")
+        sessions = run_json([herdr_bin(cfg), "session", "list", "--json"])
+        sessions = sessions.get("sessions")
+    except Exception:
+        return None
+    if not isinstance(sessions, list):
+        return None
+    names = [entry.get("name") for entry in sessions
+             if isinstance(entry, dict) and entry.get("running") is True
+             and isinstance(entry.get("name"), str)]
+    wanted = cfg.get("sessions")
+    if isinstance(wanted, list):
+        names = [name for name in names if name in wanted]
+    return names
+
+
+def fetch_session_agents(cfg, session):
+    try:
+        agents = run_json(herdr_argv(cfg, session, "agent", "list"))
+        agents = agents.get("result", {}).get("agents")
     except Exception:
         return []
-    return agents if isinstance(agents, list) else []
+    if not isinstance(agents, list):
+        return []
+    if session is None:
+        return agents
+    return [dict(agent, session=session) for agent in agents
+            if isinstance(agent, dict)]
+
+
+def fetch_agents(cfg, sessions=None):
+    if sessions is None:
+        sessions = list_sessions(cfg)
+    if sessions is None:
+        return fetch_session_agents(cfg, None)
+    agents = []
+    for session in sessions:
+        agents.extend(fetch_session_agents(cfg, session))
+    return agents
 
 
 def pick_herdr_window(clients, terminal):

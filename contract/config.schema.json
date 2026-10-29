@@ -24,7 +24,8 @@
       }
     },
     "poll_seconds": {"type": "number", "exclusiveMinimum": 0},
-    "herdr_bin": {"type": ["string", "null"]}
+    "herdr_bin": {"type": ["string", "null"]},
+    "sessions": {"type": ["array", "null"], "items": {"type": "string"}}
   },
   "properties": {
     "urgency": {
@@ -48,6 +49,7 @@
     },
     "poll_seconds": {"type": "number", "exclusiveMinimum": 0, "default": 1.5},
     "herdr_bin": {"type": ["string", "null"], "default": null},
+    "sessions": {"type": ["array", "null"], "items": {"type": "string"}, "default": null},
     "waybar": {
       "type": "object",
       "additionalProperties": false,
@@ -56,6 +58,7 @@
         "colors": {"$ref": "#/$defs/colors"},
         "poll_seconds": {"$ref": "#/$defs/poll_seconds"},
         "herdr_bin": {"$ref": "#/$defs/herdr_bin"},
+        "sessions": {"$ref": "#/$defs/sessions"},
         "icons": {
           "type": "object",
           "additionalProperties": false,
@@ -92,6 +95,7 @@
         "colors": {"$ref": "#/$defs/colors"},
         "poll_seconds": {"$ref": "#/$defs/poll_seconds"},
         "herdr_bin": {"$ref": "#/$defs/herdr_bin"},
+        "sessions": {"$ref": "#/$defs/sessions"},
         "icons": {
           "type": "object",
           "additionalProperties": false,

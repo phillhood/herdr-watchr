@@ -165,3 +165,9 @@ The fully resolved config is flat: the host section is merged over the shared
 trunk and the host-section keys are then removed from the result, so a
 resolved config has `signal` at the top level, not under `waybar`, and carries
 no `waybar` or `macos` key at all.
+
+`sessions` chooses which herdr sessions a host watches: `null` (the default)
+means every session `herdr session list --json` reports as running; a list
+keeps only the running sessions it names, without reordering them. When
+session discovery fails, a host watches the unscoped `herdr agent list` and
+leaves agents untagged.

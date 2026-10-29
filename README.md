@@ -87,6 +87,7 @@ and leaves the other four alone.
 | `colors.<status>` | neutral palette | Glyph colour |
 | `poll_seconds` | `1.5` | How often `notify` re-checks herdr |
 | `herdr_bin` | `null` | Path to `herdr`; falls back to `PATH`, then `~/.local/bin/herdr` |
+| `sessions` | `null` | herdr sessions to watch. `null` watches every running session; a list keeps only those named |
 | `waybar.icons.<status>` | Material Design glyphs | Glyph rendered in the module |
 | `waybar.signal` | `8` | `SIGRTMIN+n` raised by `notify`, matching each module's `signal` |
 | `waybar.click_action` | `"first"` | `first` focuses the group's first agent; `cycle` advances through them |

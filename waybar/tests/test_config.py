@@ -58,6 +58,14 @@ class TestDeepMerge(ConfigCase):
 
 
 class TestResolution(ConfigCase):
+    def test_sessions_default_to_every_running_session(self):
+        self.assertIsNone(hw.load_config(env=MISSING)["sessions"])
+
+    def test_the_host_section_can_override_sessions(self):
+        env = self.with_config({"sessions": ["default"],
+                                "waybar": {"sessions": ["work"]}})
+        self.assertEqual(hw.load_config(env=env)["sessions"], ["work"])
+
     def test_defaults_apply_when_there_is_no_file(self):
         cfg = hw.load_config(env=MISSING)
         self.assertEqual(cfg["colors"]["blocked"], "#d64545")
@@ -195,6 +203,7 @@ class TestSchemaPermitsHostSectionOverrides(ConfigCase):
                 self.assertIn("urgency", properties)
                 self.assertIn("poll_seconds", properties)
                 self.assertIn("herdr_bin", properties)
+                self.assertIn("sessions", properties)
                 self.assertFalse(schema["properties"][section]["additionalProperties"])
 
 

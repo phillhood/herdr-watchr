@@ -76,5 +76,130 @@ class TestBinaryResolution(unittest.TestCase):
                              os.path.expanduser("~/.local/bin/herdr"))
 
 
+SESSIONS = {"sessions": [{"name": "default", "running": True},
+                         {"name": "work", "running": True},
+                         {"name": "old", "running": False}]}
+
+
+def router(responses):
+    calls = []
+
+    def run(argv, **kwargs):
+        calls.append(argv)
+        value = responses.get(tuple(argv[1:]))
+        if isinstance(value, BaseException):
+            raise value
+        return completed(json.dumps(value) if value is not None else "")
+
+    return run, calls
+
+
+def agents_payload(*panes):
+    return {"result": {"agents": [{"pane_id": pane} for pane in panes]}}
+
+
+class TestSessionDiscovery(unittest.TestCase):
+    def setUp(self):
+        hw._WARNED.clear()
+        self.cfg = {"herdr_bin": "/opt/herdr", "sessions": None}
+
+    def test_running_sessions_are_returned_in_order(self):
+        run, calls = router({("session", "list", "--json"): SESSIONS})
+        with mock.patch.object(hw.subprocess, "run", side_effect=run):
+            self.assertEqual(hw.list_sessions(self.cfg), ["default", "work"])
+        self.assertEqual(calls, [["/opt/herdr", "session", "list", "--json"]])
+
+    def test_the_sessions_key_filters_without_reordering(self):
+        self.cfg["sessions"] = ["work", "old", "missing", "default"]
+        run, _ = router({("session", "list", "--json"): SESSIONS})
+        with mock.patch.object(hw.subprocess, "run", side_effect=run):
+            self.assertEqual(hw.list_sessions(self.cfg), ["default", "work"])
+
+    def test_a_truthy_non_boolean_running_value_is_not_running(self):
+        payload = {"sessions": [{"name": "default", "running": "yes"}]}
+        run, _ = router({("session", "list", "--json"): payload})
+        with mock.patch.object(hw.subprocess, "run", side_effect=run):
+            self.assertEqual(hw.list_sessions(self.cfg), [])
+
+    def test_a_failing_session_list_returns_none(self):
+        run, _ = router({("session", "list", "--json"): FileNotFoundError()})
+        with mock.patch.object(hw.subprocess, "run", side_effect=run):
+            self.assertIsNone(hw.list_sessions(self.cfg))
+
+    def test_output_without_a_sessions_array_returns_none(self):
+        run, _ = router({("session", "list", "--json"): {"result": {}}})
+        with mock.patch.object(hw.subprocess, "run", side_effect=run):
+            self.assertIsNone(hw.list_sessions(self.cfg))
+
+
+class TestSessionAgents(unittest.TestCase):
+    def setUp(self):
+        hw._WARNED.clear()
+        self.cfg = {"herdr_bin": "/opt/herdr", "sessions": None}
+
+    def test_agents_from_every_running_session_are_tagged(self):
+        run, calls = router({
+            ("session", "list", "--json"): SESSIONS,
+            ("--session", "default", "agent", "list"): agents_payload("w1:p1"),
+            ("--session", "work", "agent", "list"): agents_payload("w1:p1"),
+        })
+        with mock.patch.object(hw.subprocess, "run", side_effect=run):
+            agents = hw.fetch_agents(self.cfg)
+        self.assertEqual(agents, [{"pane_id": "w1:p1", "session": "default"},
+                                  {"pane_id": "w1:p1", "session": "work"}])
+        self.assertNotIn(["/opt/herdr", "--session", "old", "agent", "list"], calls)
+
+    def test_a_failing_session_is_skipped(self):
+        run, _ = router({
+            ("session", "list", "--json"): SESSIONS,
+            ("--session", "default", "agent", "list"): agents_payload("w1:p1"),
+            ("--session", "work", "agent", "list"):
+                hw.subprocess.TimeoutExpired(cmd="herdr", timeout=3),
+        })
+        with mock.patch.object(hw.subprocess, "run", side_effect=run):
+            agents = hw.fetch_agents(self.cfg)
+        self.assertEqual(agents, [{"pane_id": "w1:p1", "session": "default"}])
+
+    def test_failed_discovery_falls_back_to_the_unscoped_list(self):
+        run, calls = router({
+            ("session", "list", "--json"): FileNotFoundError(),
+            ("agent", "list"): agents_payload("w1:p1"),
+        })
+        with mock.patch.object(hw.subprocess, "run", side_effect=run):
+            agents = hw.fetch_agents(self.cfg)
+        self.assertEqual(agents, [{"pane_id": "w1:p1"}])
+        self.assertEqual(calls[-1], ["/opt/herdr", "agent", "list"])
+
+    def test_no_running_session_yields_empty_without_an_agent_query(self):
+        run, calls = router({("session", "list", "--json"): {"sessions": []}})
+        with mock.patch.object(hw.subprocess, "run", side_effect=run):
+            self.assertEqual(hw.fetch_agents(self.cfg), [])
+        self.assertEqual(len(calls), 1)
+
+    def test_known_sessions_skip_discovery(self):
+        run, calls = router({
+            ("--session", "work", "agent", "list"): agents_payload("w1:p1"),
+        })
+        with mock.patch.object(hw.subprocess, "run", side_effect=run):
+            agents = hw.fetch_agents(self.cfg, ["work"])
+        self.assertEqual(agents, [{"pane_id": "w1:p1", "session": "work"}])
+        self.assertEqual(calls, [["/opt/herdr", "--session", "work", "agent", "list"]])
+
+    def test_non_object_agents_are_dropped_when_tagging(self):
+        run, _ = router({
+            ("--session", "work", "agent", "list"):
+                {"result": {"agents": ["junk", {"pane_id": "w1:p1"}]}},
+        })
+        with mock.patch.object(hw.subprocess, "run", side_effect=run):
+            agents = hw.fetch_agents(self.cfg, ["work"])
+        self.assertEqual(agents, [{"pane_id": "w1:p1", "session": "work"}])
+
+    def test_herdr_argv_scopes_only_when_a_session_is_given(self):
+        self.assertEqual(hw.herdr_argv(self.cfg, "work", "agent", "list"),
+                         ["/opt/herdr", "--session", "work", "agent", "list"])
+        self.assertEqual(hw.herdr_argv(self.cfg, None, "agent", "list"),
+                         ["/opt/herdr", "agent", "list"])
+
+
 if __name__ == "__main__":
     unittest.main()
