@@ -60,7 +60,7 @@ survives, so stow stays intact.
 | Subcommand | Behaviour |
 |---|---|
 | `status <name>` | Emit one status module's JSON and exit |
-| `focus-status <name>` | Focus an agent in <name> within its herdr session, then raise that session's terminal window |
+| `focus-status <name>` | Focus an agent in `<name>` within its herdr session, then raise that session's terminal window |
 | `notify` | Poll herdr and raise `SIGRTMIN+signal` when the displayed state changes |
 
 `notify` is the hidden module in the group. herdr publishes status events per
