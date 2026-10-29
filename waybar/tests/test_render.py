@@ -9,9 +9,12 @@ hw = support.load_script()
 MISSING = {"HERDR_WATCHR_CONFIG": "/nonexistent/herdr-watchr/config.json"}
 
 
-def agent(status, ws="w1", title="task", pane="w1:p1", tid="t1"):
-    return {"agent_status": status, "workspace_id": ws, "pane_id": pane,
-            "terminal_id": tid, "terminal_title_stripped": title}
+def agent(status, ws="w1", title="task", pane="w1:p1", tid="t1", session=None):
+    out = {"agent_status": status, "workspace_id": ws, "pane_id": pane,
+           "terminal_id": tid, "terminal_title_stripped": title}
+    if session is not None:
+        out["session"] = session
+    return out
 
 
 class RenderCase(unittest.TestCase):
@@ -54,6 +57,23 @@ class TestStatusOutput(RenderCase):
         out = hw.status_output("blocked", [agent("blocked")], cfg)
         self.assertIn("#ed8796", out["text"])
 
+    def test_the_tooltip_names_sessions_when_agents_span_several(self):
+        agents = [agent("idle", ws="w1", title="b", pane="w1:p1", session="work"),
+                  agent("idle", ws="w5", title="a", pane="w5:p1", session="default")]
+        self.assertEqual(hw.status_output("idle", agents, self.cfg)["tooltip"],
+                         "default  w5  a\nwork  w1  b")
+
+    def test_the_prefix_follows_every_fetched_agent_not_just_the_group(self):
+        agents = [agent("idle", ws="w5", title="a", pane="w5:p1", session="default"),
+                  agent("blocked", pane="w1:p1", session="work")]
+        self.assertEqual(hw.status_output("idle", agents, self.cfg)["tooltip"],
+                         "default  w5  a")
+
+    def test_a_single_session_gets_no_prefix(self):
+        agents = [agent("idle", ws="w5", title="a", pane="w5:p1", session="work")]
+        self.assertEqual(hw.status_output("idle", agents, self.cfg)["tooltip"],
+                         "w5  a")
+
 
 class TestAgentLine(RenderCase):
     def test_pango_markup_is_escaped(self):
@@ -72,6 +92,11 @@ class TestAgentLine(RenderCase):
         self.assertEqual(hw.agent_line({"workspace_id": "w1",
                                         "terminal_title_stripped": "  x  "}),
                          "w1  x")
+
+    def test_the_session_prefix_is_escaped(self):
+        line = hw.agent_line(agent("idle", ws="w5", title="x", session="a<b"),
+                             show_session=True)
+        self.assertEqual(line, "a&lt;b  w5  x")
 
 
 class TestStateSignature(RenderCase):
@@ -100,6 +125,19 @@ class TestStateSignature(RenderCase):
         self.assertEqual(
             hw.state_signature([agent("idle", pane="w1:p1", title="a")], urgency),
             hw.state_signature([agent("idle", pane="w1:p1", title="b")], urgency))
+
+    def test_the_same_pane_in_two_sessions_is_two_agents(self):
+        urgency = self.cfg["urgency"]
+        one = [agent("idle", pane="w1:p1", session="default")]
+        two = one + [agent("idle", pane="w1:p1", session="work")]
+        self.assertNotEqual(hw.state_signature(one, urgency),
+                            hw.state_signature(two, urgency))
+
+    def test_it_changes_when_an_agent_moves_session(self):
+        urgency = self.cfg["urgency"]
+        self.assertNotEqual(
+            hw.state_signature([agent("idle", session="default")], urgency),
+            hw.state_signature([agent("idle", session="work")], urgency))
 
 
 class TestEmit(RenderCase):

@@ -213,10 +213,17 @@ def pango_escape(text):
                 .replace(">", "&gt;"))
 
 
-def agent_line(agent):
+def spans_sessions(agents):
+    return len(set(a.get("session") for a in agents if a.get("session"))) > 1
+
+
+def agent_line(agent, show_session=False):
     workspace = agent.get("workspace_id") or "?"
     title = (agent.get("terminal_title_stripped") or "").strip()
-    return "%s  %s" % (pango_escape(workspace), pango_escape(title))
+    line = "%s  %s" % (pango_escape(workspace), pango_escape(title))
+    if show_session:
+        line = "%s  %s" % (pango_escape(agent.get("session") or "?"), line)
+    return line
 
 
 def status_output(name, agents, cfg):
@@ -226,13 +233,15 @@ def status_output(name, agents, cfg):
                 "class": ["herdr-watchr", name, "empty"]}
     text = "<span color='%s'>%s</span> %d" % (
         cfg["colors"][name], cfg["icons"][name], len(matching))
+    show_session = spans_sessions(agents)
     return {"text": text,
-            "tooltip": "\n".join(agent_line(a) for a in matching),
+            "tooltip": "\n".join(agent_line(a, show_session) for a in matching),
             "class": ["herdr-watchr", name]}
 
 
 def state_signature(agents, urgency):
-    return tuple(sorted((a.get("pane_id") or "", status_of(a, urgency))
+    return tuple(sorted((a.get("session") or "", a.get("pane_id") or "",
+                         status_of(a, urgency))
                         for a in agents))
 
 
