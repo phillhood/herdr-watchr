@@ -62,6 +62,7 @@ Given a status group already in contract order, and `click_action`:
   group of the focused agent. When no agent in the group is focused —
   including when the focused agent is in a different status, or when no agent
   anywhere is focused — it falls back to `matching[0]`.
+- An empty group selects nothing.
 
 Each herdr session reports its own focused agent, so a host watching several
 sessions may see several. The host may supply `active_session`: the session
@@ -74,8 +75,6 @@ the user is working in, however the host determines it.
   in the group whose `focused` is true, whatever its session.
 
 `first` ignores `active_session`.
-
-- An empty group selects nothing.
 
 Any `click_action` value other than `cycle` behaves as `first`.
 
@@ -113,8 +112,8 @@ expected outcome.
 `"expect": null` means the group is empty and nothing is selected. Both target
 keys are required, and `expected` carries no other keys.
 
-An agent may carry `session`, a non-empty string without `/`. In `agents` and
-in each target's `expect`, an agent with a `session` is written
+An agent may carry `session`, a non-empty string without `/`. In
+`expected.agents` and in each target's `expect`, an agent with a `session` is written
 `"<session>/<pane_id>"` (`"work/w1:p1"`); one without is its bare `pane_id`.
 `cycle_target` may carry `active_session`, passed as the §4 input; `first_target`
 does not.

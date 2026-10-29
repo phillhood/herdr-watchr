@@ -17,6 +17,8 @@ WORKSPACES = {
 def client(addr, title, history, cls=GHOSTTY):
     return {"address": addr, "title": title, "class": cls,
             "focusHistoryID": history}
+
+
 LUA_CMD = ["hyprctl", "dispatch", 'hl.dsp.focus({window="address:{addr}"})']
 
 
@@ -44,21 +46,20 @@ class TestRenderTitle(FocusCase):
 
 
 class TestSessionTitles(FocusCase):
-    def test_the_focused_label_and_the_target_label_are_both_candidates(self):
+    def test_only_the_focused_label_is_a_candidate(self):
         self.assertEqual(
             hw.session_titles(TERMINAL["title"], "chorrol", "default",
-                              WORKSPACES["default"], "w8"),
-            {"chorrol: homelab", "chorrol: dotfiles"})
-
-    def test_an_unknown_target_workspace_adds_nothing(self):
-        self.assertEqual(
-            hw.session_titles(TERMINAL["title"], "chorrol", "default",
-                              WORKSPACES["default"], "w99"),
+                              WORKSPACES["default"]),
             {"chorrol: homelab"})
+
+    def test_no_focused_workspace_predicts_nothing(self):
+        unfocused = [{"workspace_id": "w1", "label": "x", "focused": False}]
+        self.assertEqual(hw.session_titles(TERMINAL["title"], "chorrol", "work",
+                                           unfocused), set())
 
     def test_missing_workspaces_predict_nothing(self):
         self.assertEqual(hw.session_titles(TERMINAL["title"], "chorrol", "work",
-                                           None, "w1"), set())
+                                           None), set())
 
     def test_a_literal_title_needs_no_workspaces(self):
         self.assertEqual(hw.session_titles("herdr", "chorrol", "work", None),
@@ -102,6 +103,18 @@ class TestPickWindow(FocusCase):
 
     def test_no_class_and_no_title_match_returns_none(self):
         self.assertIsNone(hw.pick_herdr_window([client("0x1", "x", 0)], set(), None))
+
+    def test_the_class_fallback_skips_another_sessions_window(self):
+        clients = [client("0xhome", "chorrol: homelab", 0),
+                   client("0xwork", "chorrol: helios", 3)]
+        self.assertEqual(hw.pick_herdr_window(clients, {"chorrol: nope"}, GHOSTTY,
+                                              {"chorrol: homelab"})["address"],
+                         "0xwork")
+
+    def test_the_class_fallback_finds_nothing_when_every_window_is_foreign(self):
+        clients = [client("0xhome", "chorrol: homelab", 0)]
+        self.assertIsNone(hw.pick_herdr_window(clients, set(), GHOSTTY,
+                                               {"chorrol: homelab"}))
 
     def test_non_object_clients_are_ignored(self):
         self.assertIsNone(hw.pick_herdr_window(["junk"], {"t"}, GHOSTTY))
@@ -185,6 +198,34 @@ class TestFindTerminalWindow(FocusCase):
                                              WORKSPACES, "chorrol")
         self.assertEqual(window["address"], "0xwork")
 
+    def test_a_label_shown_by_another_session_does_not_steal_the_raise(self):
+        workspaces = {
+            "default": [{"workspace_id": "w8", "label": "dotfiles", "focused": True}],
+            "work": [{"workspace_id": "w1", "label": "helios", "focused": True},
+                     {"workspace_id": "w2", "label": "dotfiles", "focused": False}],
+        }
+        clients = [client("0xhome", "chorrol: dotfiles", 0),
+                   client("0xwork", "chorrol: helios", 3)]
+        run, _ = hypr_router({("hyprctl", "-j", "clients"): clients})
+        target = {"session": "work", "workspace_id": "w2"}
+        with mock.patch.object(hw.subprocess, "run", side_effect=run):
+            window = hw.find_terminal_window({"terminal": TERMINAL}, target,
+                                             workspaces, "chorrol")
+        self.assertEqual(window["address"], "0xwork")
+
+    def test_a_session_without_a_window_raises_nothing(self):
+        workspaces = dict(WORKSPACES)
+        workspaces["list"] = [{"workspace_id": "w1", "label": "scratch",
+                               "focused": True}]
+        clients = [client("0xhome", "chorrol: homelab", 0),
+                   client("0xwork", "chorrol: helios", 3)]
+        run, _ = hypr_router({("hyprctl", "-j", "clients"): clients})
+        with mock.patch.object(hw.subprocess, "run", side_effect=run):
+            window = hw.find_terminal_window({"terminal": TERMINAL},
+                                             {"session": "list"}, workspaces,
+                                             "chorrol")
+        self.assertIsNone(window)
+
     def test_a_failing_client_query_finds_nothing(self):
         with mock.patch.object(hw.subprocess, "run", side_effect=FileNotFoundError()):
             self.assertIsNone(hw.find_terminal_window(
@@ -242,7 +283,8 @@ class TestRaiseTerminalWindow(FocusCase):
 class TestFocusAgent(FocusCase):
     def setUp(self):
         super().setUp()
-        self.cfg = {"herdr_bin": "/opt/herdr", "focus_window_cmd": ["raise", "{session}"]}
+        self.cfg = {"herdr_bin": "/opt/herdr",
+                    "focus_window_cmd": ["raise", "{session}"]}
 
     def test_no_terminal_id_does_nothing(self):
         with mock.patch.object(hw.subprocess, "run") as run:

@@ -116,6 +116,18 @@ def tagged(status, pane, tid, session, focused=False, ws="w1"):
 
 
 class TestFocusStatusCommand(CliCase):
+    def test_first_without_a_raise_command_queries_no_workspaces(self):
+        cfg = hw.load_config(env=MISSING)
+        cfg["focus_window_cmd"] = None
+        target = tagged("idle", "w1:p1", "t3", "work")
+        with mock.patch.object(hw, "load_config", return_value=cfg), \
+             mock.patch.object(hw, "list_sessions", return_value=["work"]), \
+             mock.patch.object(hw, "fetch_agents", return_value=[target]), \
+             mock.patch.object(hw, "load_workspaces") as load, \
+             mock.patch.object(hw, "focus_agent"):
+            hw.cmd_focus_status("idle")
+        load.assert_not_called()
+
     def run_click(self, name, click_action, agents, active_title):
         cfg = hw.load_config(env=MISSING)
         cfg["herdr_bin"] = "/opt/herdr"

@@ -321,26 +321,18 @@ def focused_label(workspaces):
     return None
 
 
-def workspace_label(workspaces, workspace_id):
-    for workspace in workspaces:
-        if workspace.get("workspace_id") == workspace_id:
-            return workspace.get("label") or ""
-    return None
-
-
-def session_titles(template, hostname, session, workspaces, workspace_id=None):
+def session_titles(template, hostname, session, workspaces):
     if not isinstance(template, str):
         return set()
     if "{workspace}" not in template:
-        labels = [""]
+        label = ""
     elif workspaces is None:
         return set()
     else:
-        labels = [focused_label(workspaces)]
-        if workspace_id:
-            labels.append(workspace_label(workspaces, workspace_id))
-    return set(render_title(template, hostname, label, session or "")
-               for label in labels if label is not None)
+        label = focused_label(workspaces)
+        if label is None:
+            return set()
+    return set([render_title(template, hostname, label, session or "")])
 
 
 def fetch_workspaces(cfg, session):
@@ -373,11 +365,12 @@ def recency(client):
     return float("inf")
 
 
-def pick_herdr_window(clients, titles, window_class):
+def pick_herdr_window(clients, titles, window_class, foreign=()):
     clients = [c for c in clients if isinstance(c, dict)]
     pool = [c for c in clients if c.get("title") in titles]
     if not pool and window_class:
-        pool = [c for c in clients if c.get("class") == window_class]
+        pool = [c for c in clients if c.get("class") == window_class
+                and c.get("title") not in foreign]
     return min(pool, key=recency) if pool else None
 
 
@@ -400,10 +393,14 @@ def find_terminal_window(cfg, target, workspaces, hostname):
     if not isinstance(clients, list):
         return None
     terminal = cfg.get("terminal") or {}
+    template = terminal.get("title")
     session = target.get("session")
-    titles = session_titles(terminal.get("title"), hostname, session,
-                            workspaces.get(session), target.get("workspace_id"))
-    return pick_herdr_window(clients, titles, terminal.get("class"))
+    titles = session_titles(template, hostname, session, workspaces.get(session))
+    foreign = set()
+    for other, listing in workspaces.items():
+        if other != session:
+            foreign |= session_titles(template, hostname, other, listing)
+    return pick_herdr_window(clients, titles, terminal.get("class"), foreign)
 
 
 def render_focus_cmd(template, addr, session=""):
@@ -471,14 +468,16 @@ def cmd_focus_status(name):
         matching = group_agents(agents, cfg["urgency"]).get(name) or []
         if not matching:
             return
+        cycle = cfg.get("click_action") == "cycle"
+        raise_cmd = cfg.get("focus_window_cmd")
         hostname = socket.gethostname()
-        workspaces = load_workspaces(cfg, sessions)
+        workspaces = load_workspaces(cfg, sessions) if cycle or raise_cmd else {}
         active = None
-        if cfg.get("click_action") == "cycle":
+        if cycle:
             active = find_active_session(cfg, sessions, workspaces, hostname)
         target = select_target(matching, cfg.get("click_action"), active)
         window = None
-        if cfg.get("focus_window_cmd"):
+        if raise_cmd:
             window = find_terminal_window(cfg, target, workspaces, hostname)
     except Exception as exc:
         warn("cannot focus status %s: %s" % (name, exc))

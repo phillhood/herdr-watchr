@@ -119,7 +119,10 @@ attached to that session. That terminal is found by title: herdr titles it
 `{hostname}: {workspace}` by default, and `waybar.terminal.title` predicts it
 from the session's focused workspace. If you change herdr's `ui.window_title`,
 change `waybar.terminal.title` to match. When two sessions' terminals carry
-the same title, or none matches, the most recently focused terminal wins.
+the same title, the most recently focused
+one wins. When none carries the predicted title, the most recently focused
+terminal that doesn't belong to another session is raised, and if there is
+none, nothing is.
 
 With `click_action: cycle`, the session whose terminal you were last in decides
 which agent counts as focused.
