@@ -58,6 +58,10 @@ class TestDeepMerge(ConfigCase):
 
 
 class TestResolution(ConfigCase):
+    def test_the_terminal_title_defaults_to_herdrs_window_title(self):
+        self.assertEqual(hw.load_config(env=MISSING)["terminal"]["title"],
+                         "{hostname}: {workspace}")
+
     def test_sessions_default_to_every_running_session(self):
         self.assertIsNone(hw.load_config(env=MISSING)["sessions"])
 

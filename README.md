@@ -91,8 +91,8 @@ and leaves the other four alone.
 | `waybar.icons.<status>` | Material Design glyphs | Glyph rendered in the module |
 | `waybar.signal` | `8` | `SIGRTMIN+n` raised by `notify`, matching each module's `signal` |
 | `waybar.click_action` | `"first"` | `first` focuses the group's first agent; `cycle` advances through them |
-| `waybar.terminal.title` | `"herdr"` | Preferred window title when locating the terminal |
-| `waybar.terminal.class` | `"com.mitchellh.ghostty"` | Window class fallback |
+| `waybar.terminal.title` | `"{hostname}: {workspace}"` | Title template of the terminal running herdr. `{hostname}`, `{workspace}` (a workspace label) and `{session}` are substituted; mirror herdr's `ui.window_title` |
+| `waybar.terminal.class` | `"com.mitchellh.ghostty"` | Window class fallback when no title matches; the most recently focused match wins |
 | `waybar.focus_window_cmd` | `["hyprctl","dispatch","focuswindow","address:{addr}"]` | Templated argv; `{addr}` is substituted per element. `null` skips the raise |
 
 | Env var | Overrides |

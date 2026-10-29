@@ -77,7 +77,7 @@
           "additionalProperties": false,
           "properties": {
             "class": {"type": "string", "default": "com.mitchellh.ghostty"},
-            "title": {"type": "string", "default": "herdr"}
+            "title": {"type": "string", "default": "{hostname}: {workspace}"}
           }
         },
         "focus_window_cmd": {

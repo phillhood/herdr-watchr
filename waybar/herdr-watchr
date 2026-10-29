@@ -9,6 +9,7 @@ Subcommands:
 import json
 import os
 import shutil
+import socket
 import subprocess
 import sys
 import time
@@ -40,7 +41,8 @@ DEFAULTS = {
         },
         "signal": 8,
         "click_action": "first",
-        "terminal": {"class": "com.mitchellh.ghostty", "title": "herdr"},
+        "terminal": {"class": "com.mitchellh.ghostty",
+                     "title": "{hostname}: {workspace}"},
         "focus_window_cmd": ["hyprctl", "dispatch", "focuswindow",
                              "address:{addr}"],
     },
@@ -304,38 +306,119 @@ def fetch_agents(cfg, sessions=None):
     return agents
 
 
-def pick_herdr_window(clients, terminal):
-    title = terminal.get("title")
-    window_class = terminal.get("class")
-    if title:
-        for client in clients:
-            if client.get("title") == title:
-                return client
-    if window_class:
-        for client in clients:
-            if client.get("class") == window_class:
-                return client
+def render_title(template, hostname, workspace, session):
+    if not isinstance(template, str):
+        return None
+    return (template.replace("{hostname}", hostname)
+                    .replace("{workspace}", workspace)
+                    .replace("{session}", session))
+
+
+def focused_label(workspaces):
+    for workspace in workspaces:
+        if workspace.get("focused") is True:
+            return workspace.get("label") or ""
     return None
 
 
-def render_focus_cmd(template, addr):
+def workspace_label(workspaces, workspace_id):
+    for workspace in workspaces:
+        if workspace.get("workspace_id") == workspace_id:
+            return workspace.get("label") or ""
+    return None
+
+
+def session_titles(template, hostname, session, workspaces, workspace_id=None):
+    if not isinstance(template, str):
+        return set()
+    if "{workspace}" not in template:
+        labels = [""]
+    elif workspaces is None:
+        return set()
+    else:
+        labels = [focused_label(workspaces)]
+        if workspace_id:
+            labels.append(workspace_label(workspaces, workspace_id))
+    return set(render_title(template, hostname, label, session or "")
+               for label in labels if label is not None)
+
+
+def fetch_workspaces(cfg, session):
+    try:
+        workspaces = run_json(herdr_argv(cfg, session, "workspace", "list"))
+        workspaces = workspaces.get("result", {}).get("workspaces")
+    except Exception:
+        return None
+    if not isinstance(workspaces, list):
+        return None
+    return [workspace for workspace in workspaces if isinstance(workspace, dict)]
+
+
+def load_workspaces(cfg, sessions):
+    keys = [None] if sessions is None else sessions
+    return dict((session, fetch_workspaces(cfg, session)) for session in keys)
+
+
+def query_hyprctl(*args):
+    try:
+        return run_json(["hyprctl", "-j"] + list(args))
+    except Exception:
+        return None
+
+
+def recency(client):
+    value = client.get("focusHistoryID")
+    if isinstance(value, int) and not isinstance(value, bool):
+        return value
+    return float("inf")
+
+
+def pick_herdr_window(clients, titles, window_class):
+    clients = [c for c in clients if isinstance(c, dict)]
+    pool = [c for c in clients if c.get("title") in titles]
+    if not pool and window_class:
+        pool = [c for c in clients if c.get("class") == window_class]
+    return min(pool, key=recency) if pool else None
+
+
+def find_active_session(cfg, sessions, workspaces, hostname):
+    if not sessions:
+        return None
+    active = query_hyprctl("activewindow")
+    title = active.get("title") if isinstance(active, dict) else None
+    if not title:
+        return None
+    template = (cfg.get("terminal") or {}).get("title")
+    matches = [session for session in sessions
+               if title in session_titles(template, hostname, session,
+                                          workspaces.get(session))]
+    return matches[0] if len(matches) == 1 else None
+
+
+def find_terminal_window(cfg, target, workspaces, hostname):
+    clients = query_hyprctl("clients")
+    if not isinstance(clients, list):
+        return None
+    terminal = cfg.get("terminal") or {}
+    session = target.get("session")
+    titles = session_titles(terminal.get("title"), hostname, session,
+                            workspaces.get(session), target.get("workspace_id"))
+    return pick_herdr_window(clients, titles, terminal.get("class"))
+
+
+def render_focus_cmd(template, addr, session=""):
     if not template:
         return []
-    return [str(part).replace("{addr}", addr) for part in template]
+    return [str(part).replace("{addr}", addr).replace("{session}", session)
+            for part in template]
 
 
-def raise_terminal_window(cfg):
+def raise_terminal_window(cfg, window, session=None):
     template = cfg.get("focus_window_cmd")
-    if not template:
+    if not template or not window or not window.get("address"):
         return
     try:
-        proc = subprocess.run(["hyprctl", "-j", "clients"],
-                              capture_output=True, text=True, timeout=3)
-        window = pick_herdr_window(json.loads(proc.stdout),
-                                   cfg.get("terminal") or {})
-        if not window or not window.get("address"):
-            return
-        subprocess.run(render_focus_cmd(template, window["address"]),
+        subprocess.run(render_focus_cmd(template, window["address"], session or ""),
                        capture_output=True, text=True, timeout=3)
     except Exception as exc:
         warn("cannot raise the terminal window: %s" % exc)
@@ -349,7 +432,7 @@ def focus_agent(cfg, terminal_id):
                        capture_output=True, text=True, timeout=3)
     except Exception as exc:
         warn("cannot focus the agent: %s" % exc)
-    raise_terminal_window(cfg)
+    raise_terminal_window(cfg, None)
 
 
 def nudge(signal):
