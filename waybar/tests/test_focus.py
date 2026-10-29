@@ -207,35 +207,75 @@ class TestFocusCommandTemplate(FocusCase):
     def test_an_empty_template_renders_nothing(self):
         self.assertEqual(hw.render_focus_cmd([], "0xabc"), [])
 
+    def test_session_is_substituted_in_every_element(self):
+        self.assertEqual(hw.render_focus_cmd(["x", "{session}:{addr}"], "0x1", "work"),
+                         ["x", "work:0x1"])
+
+    def test_session_defaults_to_empty(self):
+        self.assertEqual(hw.render_focus_cmd(["{session}"], "0x1"), [""])
+
 
 class TestRaiseTerminalWindow(FocusCase):
-    def test_a_null_template_skips_the_client_query(self):
+    def test_a_null_template_runs_nothing(self):
         with mock.patch.object(hw.subprocess, "run") as run:
-            hw.raise_terminal_window({"focus_window_cmd": None, "terminal": TERMINAL},
-                                     {"address": "0x1"})
+            hw.raise_terminal_window({"focus_window_cmd": None}, {"address": "0x1"})
         run.assert_not_called()
 
+    def test_no_window_runs_nothing(self):
+        with mock.patch.object(hw.subprocess, "run") as run:
+            hw.raise_terminal_window({"focus_window_cmd": LUA_CMD}, None)
+        run.assert_not_called()
+
+    def test_it_dispatches_the_rendered_command(self):
+        with mock.patch.object(hw.subprocess, "run") as run:
+            hw.raise_terminal_window({"focus_window_cmd": LUA_CMD},
+                                     {"address": "0xfeed"}, "work")
+        self.assertEqual(run.call_args.args[0][2],
+                         'hl.dsp.focus({window="address:0xfeed"})')
+        self.assertEqual(run.call_args.kwargs["timeout"], 3)
+
     def test_a_missing_hyprctl_does_not_raise(self):
-        cfg = {"focus_window_cmd": LUA_CMD, "terminal": TERMINAL}
         with mock.patch.object(hw.subprocess, "run", side_effect=FileNotFoundError()):
-            hw.raise_terminal_window(cfg, {"address": "0x1"})
+            hw.raise_terminal_window({"focus_window_cmd": LUA_CMD}, {"address": "0x1"})
 
 
 class TestFocusAgent(FocusCase):
+    def setUp(self):
+        super().setUp()
+        self.cfg = {"herdr_bin": "/opt/herdr", "focus_window_cmd": ["raise", "{session}"]}
+
     def test_no_terminal_id_does_nothing(self):
-        cfg = {"herdr_bin": "/opt/herdr", "focus_window_cmd": None}
         with mock.patch.object(hw.subprocess, "run") as run:
-            hw.focus_agent(cfg, None)
+            hw.focus_agent(self.cfg, {"session": "work"}, {"address": "0x1"})
         run.assert_not_called()
 
-    def test_it_focuses_the_agent_with_a_three_second_timeout(self):
-        cfg = {"herdr_bin": "/opt/herdr", "focus_window_cmd": None,
-               "terminal": TERMINAL}
+    def test_it_focuses_within_the_agents_session_then_raises(self):
         with mock.patch.object(hw.subprocess, "run") as run:
-            hw.focus_agent(cfg, "t9")
-        self.assertEqual(run.call_args.args[0],
-                         ["/opt/herdr", "agent", "focus", "t9"])
-        self.assertEqual(run.call_args.kwargs["timeout"], 3)
+            hw.focus_agent(self.cfg, {"terminal_id": "t9", "session": "work"},
+                           {"address": "0x1"})
+        self.assertEqual([c.args[0] for c in run.call_args_list],
+                         [["/opt/herdr", "--session", "work", "agent", "focus", "t9"],
+                          ["raise", "work"]])
+        self.assertEqual(run.call_args_list[0].kwargs["timeout"], 3)
+
+    def test_an_untagged_agent_is_focused_unscoped(self):
+        with mock.patch.object(hw.subprocess, "run") as run:
+            hw.focus_agent(self.cfg, {"terminal_id": "t9"}, None)
+        self.assertEqual(run.call_args.args[0], ["/opt/herdr", "agent", "focus", "t9"])
+
+    def test_a_failing_focus_still_raises_the_window(self):
+        calls = []
+
+        def run(argv, **kwargs):
+            calls.append(argv)
+            if argv[0] == "/opt/herdr":
+                raise OSError("boom")
+            return mock.Mock(stdout="")
+
+        with mock.patch.object(hw.subprocess, "run", side_effect=run):
+            hw.focus_agent(self.cfg, {"terminal_id": "t9", "session": "work"},
+                           {"address": "0x1"})
+        self.assertEqual(calls[-1], ["raise", "work"])
 
 
 class TestNudge(FocusCase):

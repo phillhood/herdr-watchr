@@ -60,7 +60,7 @@ survives, so stow stays intact.
 | Subcommand | Behaviour |
 |---|---|
 | `status <name>` | Emit one status module's JSON and exit |
-| `focus-status <name>` | Focus an agent in `<name>`, then raise the terminal window |
+| `focus-status <name>` | Focus an agent in <name> within its herdr session, then raise that session's terminal window |
 | `notify` | Poll herdr and raise `SIGRTMIN+signal` when the displayed state changes |
 
 `notify` is the hidden module in the group. herdr publishes status events per
@@ -93,7 +93,7 @@ and leaves the other four alone.
 | `waybar.click_action` | `"first"` | `first` focuses the group's first agent; `cycle` advances through them |
 | `waybar.terminal.title` | `"{hostname}: {workspace}"` | Title template of the terminal running herdr. `{hostname}`, `{workspace}` (a workspace label) and `{session}` are substituted; mirror herdr's `ui.window_title` |
 | `waybar.terminal.class` | `"com.mitchellh.ghostty"` | Window class fallback when no title matches; the most recently focused match wins |
-| `waybar.focus_window_cmd` | `["hyprctl","dispatch","focuswindow","address:{addr}"]` | Templated argv; `{addr}` is substituted per element. `null` skips the raise |
+| `waybar.focus_window_cmd` | `["hyprctl","dispatch","focuswindow","address:{addr}"]` | Templated argv; `{addr}` and `{session}` are substituted per element. `null` skips the raise |
 
 | Env var | Overrides |
 |---|---|
@@ -107,6 +107,28 @@ the bar stops updating.
 
 [`waybar/examples/config.json`](waybar/examples/config.json) is the author's own:
 Catppuccin Macchiato, `cycle`, and the Hyprland Lua-config focus form.
+
+## Multiple sessions
+
+Every running herdr session is watched, so one bar shows all of them. When
+agents span more than one session, the tooltip prefixes each line with its
+session.
+
+A click focuses the agent inside its own session and raises the terminal
+attached to that session. That terminal is found by title: herdr titles it
+`{hostname}: {workspace}` by default, and `waybar.terminal.title` predicts it
+from the session's focused workspace. If you change herdr's `ui.window_title`,
+change `waybar.terminal.title` to match. When two sessions' terminals carry
+the same title, or none matches, the most recently focused terminal wins.
+
+With `click_action: cycle`, the session whose terminal you were last in decides
+which agent counts as focused.
+
+`{session}` in `focus_window_cmd` lets the raise do more than focus. With
+Hyprland workspace profiles, route it through a function you define in your
+Lua config that switches profile before focusing:
+
+    "focus_window_cmd": ["hyprctl", "eval", "focus_herdr('{addr}', '{session}')"]
 
 ## The contract
 

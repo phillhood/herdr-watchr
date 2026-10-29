@@ -424,15 +424,17 @@ def raise_terminal_window(cfg, window, session=None):
         warn("cannot raise the terminal window: %s" % exc)
 
 
-def focus_agent(cfg, terminal_id):
+def focus_agent(cfg, target, window):
+    terminal_id = target.get("terminal_id")
     if not terminal_id:
         return
+    session = target.get("session")
     try:
-        subprocess.run([herdr_bin(cfg), "agent", "focus", terminal_id],
+        subprocess.run(herdr_argv(cfg, session, "agent", "focus", terminal_id),
                        capture_output=True, text=True, timeout=3)
     except Exception as exc:
         warn("cannot focus the agent: %s" % exc)
-    raise_terminal_window(cfg, None)
+    raise_terminal_window(cfg, window, session)
 
 
 def nudge(signal):
@@ -464,13 +466,24 @@ def cmd_status(name):
 def cmd_focus_status(name):
     try:
         cfg = load_config()
-        matching = group_agents(fetch_agents(cfg), cfg["urgency"]).get(name) or []
-        target = select_target(matching, cfg.get("click_action"))
+        sessions = list_sessions(cfg)
+        agents = fetch_agents(cfg, sessions)
+        matching = group_agents(agents, cfg["urgency"]).get(name) or []
+        if not matching:
+            return
+        hostname = socket.gethostname()
+        workspaces = load_workspaces(cfg, sessions)
+        active = None
+        if cfg.get("click_action") == "cycle":
+            active = find_active_session(cfg, sessions, workspaces, hostname)
+        target = select_target(matching, cfg.get("click_action"), active)
+        window = None
+        if cfg.get("focus_window_cmd"):
+            window = find_terminal_window(cfg, target, workspaces, hostname)
     except Exception as exc:
         warn("cannot focus status %s: %s" % (name, exc))
         return
-    if target:
-        focus_agent(cfg, target.get("terminal_id"))
+    focus_agent(cfg, target, window)
 
 
 def cmd_notify():
