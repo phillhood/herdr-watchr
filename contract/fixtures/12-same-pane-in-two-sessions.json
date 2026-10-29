@@ -1,0 +1,22 @@
+{
+  "name": "the same pane_id in two sessions orders by session then pane",
+  "agents": [
+    {"pane_id": "w1:p1", "terminal_id": "t2", "agent_status": "blocked",
+     "focused": false, "workspace_id": "w1", "session": "work",
+     "terminal_title_stripped": "deploy"},
+    {"pane_id": "w2:p1", "terminal_id": "t3", "agent_status": "idle",
+     "focused": false, "workspace_id": "w2", "session": "default",
+     "terminal_title_stripped": "notes"},
+    {"pane_id": "w1:p1", "terminal_id": "t1", "agent_status": "blocked",
+     "focused": false, "workspace_id": "w1", "session": "default",
+     "terminal_title_stripped": "fix auth redirect"}
+  ],
+  "expected": {
+    "order": ["blocked", "idle"],
+    "counts": {"blocked": 2, "idle": 1},
+    "agents": {"blocked": ["default/w1:p1", "work/w1:p1"],
+               "idle": ["default/w2:p1"]},
+    "first_target": {"status": "blocked", "expect": "default/w1:p1"},
+    "cycle_target": {"status": "blocked", "expect": "default/w1:p1"}
+  }
+}

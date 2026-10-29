@@ -5,6 +5,12 @@ import support
 REQUIRED_TOP = {"name", "agents", "expected"}
 REQUIRED_EXPECTED = {"order", "counts", "agents", "first_target", "cycle_target"}
 VOCABULARY = {"blocked", "idle", "done", "working", "unknown"}
+TARGET_KEYS = {"status", "expect"}
+
+
+def ident_key(ident):
+    session, sep, pane = ident.partition("/")
+    return (session, pane) if sep else ("", ident)
 
 
 class TestFixtureShape(unittest.TestCase):
@@ -12,7 +18,7 @@ class TestFixtureShape(unittest.TestCase):
         self.fixtures = support.load_fixtures()
 
     def test_the_directory_covers_every_required_case(self):
-        self.assertGreaterEqual(len(self.fixtures), 11)
+        self.assertGreaterEqual(len(self.fixtures), 16)
 
     def test_every_fixture_has_the_required_keys(self):
         for path, data in self.fixtures:
@@ -38,7 +44,27 @@ class TestFixtureShape(unittest.TestCase):
             for name, panes in expected["agents"].items():
                 with self.subTest(fixture=path.name, status=name):
                     self.assertEqual(len(panes), expected["counts"][name])
-                    self.assertEqual(panes, sorted(panes))
+                    self.assertEqual(panes, sorted(panes, key=ident_key))
+
+    def test_every_session_tag_is_a_non_empty_string_without_a_slash(self):
+        for path, data in self.fixtures:
+            for agent in data["agents"]:
+                if "session" not in agent:
+                    continue
+                with self.subTest(fixture=path.name, pane=agent.get("pane_id")):
+                    self.assertIsInstance(agent["session"], str)
+                    self.assertTrue(agent["session"])
+                    self.assertNotIn("/", agent["session"])
+
+    def test_target_keys_are_known_and_only_cycle_takes_an_active_session(self):
+        for path, data in self.fixtures:
+            expected = data["expected"]
+            with self.subTest(fixture=path.name):
+                self.assertTrue(set(expected["first_target"]).issubset(TARGET_KEYS))
+                self.assertTrue(set(expected["cycle_target"]).issubset(
+                    TARGET_KEYS | {"active_session"}))
+                active = expected["cycle_target"].get("active_session")
+                self.assertTrue(active is None or isinstance(active, str))
 
     def test_every_expected_status_is_in_the_vocabulary(self):
         for path, data in self.fixtures:

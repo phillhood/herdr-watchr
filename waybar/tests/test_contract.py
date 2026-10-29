@@ -6,6 +6,11 @@ hw = support.load_script()
 URGENCY = ["blocked", "idle", "done", "working", "unknown"]
 
 
+def ident(agent):
+    session = agent.get("session")
+    return "%s/%s" % (session, agent["pane_id"]) if session else agent["pane_id"]
+
+
 class TestContractAgainstFixtures(unittest.TestCase):
     def setUp(self):
         self.fixtures = support.load_fixtures()
@@ -19,7 +24,7 @@ class TestContractAgainstFixtures(unittest.TestCase):
                 self.assertEqual({k: len(v) for k, v in groups.items() if v},
                                  expected["counts"])
                 self.assertEqual(
-                    {k: [a["pane_id"] for a in v] for k, v in groups.items() if v},
+                    {k: [ident(a) for a in v] for k, v in groups.items() if v},
                     expected["agents"])
 
     def test_click_targets_match_every_fixture(self):
@@ -29,10 +34,10 @@ class TestContractAgainstFixtures(unittest.TestCase):
                 target = data["expected"].get(key)
                 if not target:
                     continue
-                got = hw.select_target(groups.get(target["status"], []), action)
+                got = hw.select_target(groups.get(target["status"], []), action,
+                                       target.get("active_session"))
                 with self.subTest(fixture=path.name, target=key):
-                    self.assertEqual(got["pane_id"] if got else None,
-                                     target["expect"])
+                    self.assertEqual(ident(got) if got else None, target["expect"])
 
 
 class TestStatusMapping(unittest.TestCase):
@@ -57,6 +62,14 @@ class TestOrdering(unittest.TestCase):
         self.assertEqual([a["pane_id"] for a in hw.stable_sort(agents)],
                          ["w10:p1", "w2:p1", "w8:p1"])
 
+    def test_stable_sort_orders_by_session_before_pane(self):
+        agents = [{"pane_id": "w1:p1", "session": "work"},
+                  {"pane_id": "w2:p1", "session": "default"},
+                  {"pane_id": "w9:p1"}]
+        self.assertEqual([(a.get("session"), a["pane_id"])
+                          for a in hw.stable_sort(agents)],
+                         [(None, "w9:p1"), ("default", "w2:p1"), ("work", "w1:p1")])
+
     def test_stable_sort_tolerates_a_missing_pane_id(self):
         agents = [{"pane_id": "w1:p1"}, {}]
         self.assertEqual([a.get("pane_id") for a in hw.stable_sort(agents)],
@@ -75,6 +88,24 @@ class TestOrdering(unittest.TestCase):
 
 
 class TestSelectTarget(unittest.TestCase):
+    def test_cycle_ignores_focus_outside_the_active_session(self):
+        group = [{"pane_id": "a", "session": "default", "focused": True},
+                 {"pane_id": "b", "session": "default"},
+                 {"pane_id": "c", "session": "work", "focused": True}]
+        self.assertEqual(hw.select_target(group, "cycle", "work")["pane_id"], "a")
+        self.assertEqual(hw.select_target(group, "cycle", "default")["pane_id"], "b")
+
+    def test_cycle_without_an_active_session_uses_the_first_focused(self):
+        group = [{"pane_id": "a", "session": "default"},
+                 {"pane_id": "b", "session": "default", "focused": True},
+                 {"pane_id": "c", "session": "work", "focused": True}]
+        self.assertEqual(hw.select_target(group, "cycle", None)["pane_id"], "c")
+
+    def test_first_ignores_the_active_session(self):
+        group = [{"pane_id": "a", "session": "default"},
+                 {"pane_id": "b", "session": "work", "focused": True}]
+        self.assertEqual(hw.select_target(group, "first", "work")["pane_id"], "a")
+
     def test_an_empty_group_selects_nothing(self):
         self.assertIsNone(hw.select_target([], "first"))
         self.assertIsNone(hw.select_target([], "cycle"))

@@ -37,12 +37,17 @@ from its attributed title. The contract binds the outcome, not the mechanism.
 
 ## 3. Agent order within a status
 
-Stable sort by `pane_id` ascending, comparing the raw string. `pane_id` looks
-like `w10:p1`, so the ordering is lexicographic, not numeric: `w10:p1` sorts
-before `w2:p1`.
+Stable sort by `(session, pane_id)` ascending, comparing each as a raw string.
+`session` is not a herdr field: a host that watches several herdr sessions adds
+it to every agent it fetches, naming the session the agent came from. Sessions
+therefore order by name. `pane_id` looks like `w10:p1`, so the ordering is
+lexicographic, not numeric: `w10:p1` sorts before `w2:p1`. With a single
+session every agent carries the same `session`, and the order is by `pane_id`
+alone.
 
-A missing or null `pane_id` sorts as the empty string, so such an agent sorts
-first within its status. Ties — including two agents that both lack a
+A missing or null `session` or `pane_id` sorts as the empty string, so an
+untagged agent sorts before every tagged one, and an agent without a `pane_id`
+sorts first within its session. Ties — including two agents that both lack a
 `pane_id` — keep their input order, since the sort is stable.
 
 This is what stops a status's first agent jumping when an unrelated agent
@@ -54,22 +59,36 @@ Given a status group already in contract order, and `click_action`:
 
 - `first` selects `matching[0]`.
 - `cycle` selects `matching[(i + 1) % n]`, where *i* is the index within the
-  group of the agent whose `focused` is true. When no agent in the group is
-  focused — including when the focused agent is in a different status, or when
-  no agent anywhere is focused — it falls back to `matching[0]`.
+  group of the focused agent. When no agent in the group is focused —
+  including when the focused agent is in a different status, or when no agent
+  anywhere is focused — it falls back to `matching[0]`.
+
+Each herdr session reports its own focused agent, so a host watching several
+sessions may see several. The host may supply `active_session`: the session
+the user is working in, however the host determines it.
+
+- With `active_session` known, the focused agent is the first agent in the
+  group, in contract order, whose `focused` is true **and** whose `session`
+  equals `active_session`. A focused agent from another session is ignored.
+- With `active_session` null or absent, the focused agent is the first agent
+  in the group whose `focused` is true, whatever its session.
+
+`first` ignores `active_session`.
+
 - An empty group selects nothing.
 
 Any `click_action` value other than `cycle` behaves as `first`.
 
 `focused` counts only when its value is the boolean `true`; any other truthy
-value (a non-empty string, a non-zero number) does not select the agent. If
-more than one agent in a group is focused, the first one in contract order
-wins.
+value (a non-empty string, a non-zero number) does not select the agent.
+Among agents that qualify as focused, the first one in contract order wins.
 
 The selected agent's `pane_id` identifies and orders it within the group, but
 `pane_id` is not the handle used to act on it. Focusing an agent means calling
 `herdr agent focus <terminal_id>` with the selected agent's `terminal_id`, a
-separate field.
+separate field, scoped with `--session <session>` when the agent carries one.
+`pane_id`s are unique only within a session, so two sessions can both have a
+`w1:p1`; an agent's identity is `(session, pane_id)`.
 
 ## Fixture format
 
@@ -93,6 +112,12 @@ expected outcome.
 `cycle_target` each name a status to query and the `pane_id` expected back;
 `"expect": null` means the group is empty and nothing is selected. Both target
 keys are required, and `expected` carries no other keys.
+
+An agent may carry `session`, a non-empty string without `/`. In `agents` and
+in each target's `expect`, an agent with a `session` is written
+`"<session>/<pane_id>"` (`"work/w1:p1"`); one without is its bare `pane_id`.
+`cycle_target` may carry `active_session`, passed as the §4 input; `first_target`
+does not.
 
 ## Configuration
 

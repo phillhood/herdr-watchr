@@ -1,0 +1,18 @@
+{
+  "name": "an agent without a session sorts before tagged agents",
+  "agents": [
+    {"pane_id": "w1:p1", "terminal_id": "t1", "agent_status": "blocked",
+     "focused": false, "workspace_id": "w1", "session": "default",
+     "terminal_title_stripped": "deploy"},
+    {"pane_id": "w9:p1", "terminal_id": "t2", "agent_status": "blocked",
+     "focused": true, "workspace_id": "w9",
+     "terminal_title_stripped": "fix auth redirect"}
+  ],
+  "expected": {
+    "order": ["blocked"],
+    "counts": {"blocked": 2},
+    "agents": {"blocked": ["w9:p1", "default/w1:p1"]},
+    "first_target": {"status": "blocked", "expect": "w9:p1"},
+    "cycle_target": {"status": "blocked", "expect": "default/w1:p1"}
+  }
+}

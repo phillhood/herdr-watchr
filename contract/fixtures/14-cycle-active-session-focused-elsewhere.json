@@ -1,0 +1,23 @@
+{
+  "name": "cycle falls back to the first agent when the active session's focus is in another status",
+  "agents": [
+    {"pane_id": "w2:p1", "terminal_id": "t1", "agent_status": "blocked",
+     "focused": true, "workspace_id": "w2", "session": "default",
+     "terminal_title_stripped": "migrate schema"},
+    {"pane_id": "w1:p1", "terminal_id": "t2", "agent_status": "blocked",
+     "focused": false, "workspace_id": "w1", "session": "work",
+     "terminal_title_stripped": "deploy"},
+    {"pane_id": "w3:p1", "terminal_id": "t3", "agent_status": "idle",
+     "focused": true, "workspace_id": "w3", "session": "work",
+     "terminal_title_stripped": "review"}
+  ],
+  "expected": {
+    "order": ["blocked", "idle"],
+    "counts": {"blocked": 2, "idle": 1},
+    "agents": {"blocked": ["default/w2:p1", "work/w1:p1"],
+               "idle": ["work/w3:p1"]},
+    "first_target": {"status": "blocked", "expect": "default/w2:p1"},
+    "cycle_target": {"status": "blocked", "active_session": "work",
+                     "expect": "default/w2:p1"}
+  }
+}

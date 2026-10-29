@@ -81,8 +81,12 @@ def status_of(agent, urgency):
     return value if value in urgency else "unknown"
 
 
+def sort_key(agent):
+    return (agent.get("session") or "", agent.get("pane_id") or "")
+
+
 def stable_sort(agents):
-    return sorted(agents, key=lambda a: a.get("pane_id") or "")
+    return sorted(agents, key=sort_key)
 
 
 def group_agents(agents, urgency):
@@ -96,14 +100,17 @@ def status_order(groups, urgency):
     return [name for name in urgency if groups.get(name)]
 
 
-def select_target(matching, click_action):
+def select_target(matching, click_action, active_session=None):
     if not matching:
         return None
     if click_action != "cycle":
         return matching[0]
     for index, agent in enumerate(matching):
-        if agent.get("focused") is True:
-            return matching[(index + 1) % len(matching)]
+        if agent.get("focused") is not True:
+            continue
+        if active_session is not None and agent.get("session") != active_session:
+            continue
+        return matching[(index + 1) % len(matching)]
     return matching[0]
 
 
